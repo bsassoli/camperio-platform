@@ -1,3 +1,6 @@
+> Origine: portato da `camperio-portfolio/engine/validation` (voce 18 del registro di migrazione).
+> I riferimenti a `piano/`, `requisiti/`, `engine/` nel testo puntano al repo di origine.
+
 # Layer di validazione deterministica
 
 Fase 3 del piano (`piano/2026-06-21-ricostruzione-reportistica.md`). È il controllo

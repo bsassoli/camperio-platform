@@ -22,3 +22,9 @@ def test_num():
     assert num(1234.5, dec=1) == "1.234,5"
     assert num(1000000) == "1.000.000"
     assert num("x") == "—"
+
+
+def test_nan_e_inf_non_formattati():
+    assert eur(float("nan")) == "—"
+    assert pct(float("inf")) == "—"
+    assert num(float("-inf")) == "—"

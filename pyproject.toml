@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Piattaforma Camperio: core condiviso, jobs schedulati, app interattive, agente"
 requires-python = ">=3.13"
 
+[project.optional-dependencies]
+dev = ["pytest"]
+
 [tool.pytest.ini_options]
 pythonpath = ["core"]
 testpaths = ["core/tests"]

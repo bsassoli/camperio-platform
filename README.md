@@ -7,8 +7,8 @@ nel repo `bsassoli/migrate-camperio` (`docs/specs/2026-08-16-camperio-platform-d
 
 ## Sviluppo
 
-Senza variabili `ORA_*` tutto gira in **modalità DEMO** su fixture sintetiche —
-è il contratto di piattaforma: si sviluppa sul Mac senza Oracle.
+Serve Python ≥ 3.13. Senza variabili `ORA_*` tutto gira in **modalità DEMO** su fixture
+sintetiche — è il contratto di piattaforma: si sviluppa sul Mac senza Oracle.
 
     python3 -m venv .venv && .venv/bin/pip install pytest
     .venv/bin/python -m pytest

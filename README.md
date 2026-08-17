@@ -18,6 +18,9 @@ Per lavorare sull'app Comitato: `.venv/bin/pip install -e ".[comitato]"`.
 Configurazione: solo variabili d'ambiente via `camperio_core.config` —
 vedi `camperio.example.env` e `docs/SECRETS.md`. Tutto in italiano.
 
+Deploy: immagine, stack Compose (nginx + oauth2-proxy), unit systemd e runbook
+in `deploy/` e `docs/DEPLOY.md` (ADR 0010 del repo di pianificazione).
+
 ## Convenzione di lingua
 
 La prosa (commenti, docstring, documenti, commit) è in italiano; gli

@@ -27,6 +27,7 @@ def test_static_resta_libero_con_auth_attiva(client, monkeypatch):
 
 
 def test_upload_rifiuta_estensioni_non_ammesse(client, monkeypatch, tmp_path):
+    monkeypatch.delenv("COMITATO_AUTH", raising=False)
     monkeypatch.setattr(DL, "REPO", str(tmp_path))
     r = client.post("/upload", data={"file": (io.BytesIO(b"testo"), "note.txt")},
                     content_type="multipart/form-data")
@@ -36,6 +37,7 @@ def test_upload_rifiuta_estensioni_non_ammesse(client, monkeypatch, tmp_path):
 
 
 def test_upload_riconosce_excel_fondo_dal_contenuto(client, monkeypatch, tmp_path):
+    monkeypatch.delenv("COMITATO_AUTH", raising=False)
     monkeypatch.setattr(DL, "REPO", str(tmp_path))
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -52,9 +54,18 @@ def test_upload_riconosce_excel_fondo_dal_contenuto(client, monkeypatch, tmp_pat
     assert (tmp_path / "SUPERDISCOVERY_2026-08-14.xlsx").exists()
 
 
-def test_parametro_al_ostile_viene_riflesso_escapato(client):
+def test_parametro_al_ostile_viene_riflesso_escapato(client, monkeypatch):
+    monkeypatch.delenv("COMITATO_AUTH", raising=False)
     r = client.get("/api/preview?schema=ANTASIMGEST&codcli=DEMO01&tipo=matrice"
                    "&al=<img src=x onerror=alert(1)>")
     html = r.get_json()["html"]
     assert "<img" not in html
     assert "&lt;img" in html
+
+
+def test_header_legacy_fidato_dal_solo_nginx(client, monkeypatch):
+    # L'app si fida anche di X-Remote-User: e' nginx a doverlo azzerare
+    # (nginx.conf). Se questo test ti sorprende, aggiorna anche nginx.conf.
+    monkeypatch.setenv("COMITATO_AUTH", "1")
+    r = client.get("/", headers={"X-Remote-User": "chiunque"})
+    assert r.status_code == 200

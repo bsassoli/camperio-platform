@@ -17,4 +17,4 @@ WORKDIR /opt/camperio/apps/comitato
 EXPOSE 5001
 # 0.0.0.0 e' corretto QUI: la rete del container e' isolata; verso l'host
 # si pubblica solo su loopback (compose) e all'esterno parla solo nginx.
-CMD ["gunicorn", "--bind", "0.0.0.0:5001", "--workers", "2", "--timeout", "120", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5001", "--workers", "2", "--threads", "4", "--timeout", "120", "app:app"]

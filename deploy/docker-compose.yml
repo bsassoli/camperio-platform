@@ -19,6 +19,9 @@ services:
     volumes:
       - camperio-data:/var/lib/camperio
     # nessuna porta pubblicata: raggiungibile solo dalla rete compose (nginx)
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
 
   oauth2-proxy:
     image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
@@ -32,6 +35,9 @@ services:
       OAUTH2_PROXY_SET_XAUTHREQUEST: "true"   # espone X-Auth-Request-User/-Groups su /auth
       OAUTH2_PROXY_EMAIL_DOMAINS: "*"          # l'autorizzazione e' per gruppi Entra, non per dominio email
       OAUTH2_PROXY_OIDC_GROUPS_CLAIM: groups
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
 
   nginx:
     image: nginx:1.27-alpine
@@ -45,6 +51,9 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - /etc/camperio/tls:/etc/camperio/tls:ro       # fullchain.pem + privkey.pem (AD CS)
       - camperio-data:/var/lib/camperio:ro           # per servire output/ statico
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
 
 volumes:
   camperio-data:

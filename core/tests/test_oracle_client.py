@@ -123,6 +123,8 @@ def test_close_e_context_manager():
     client._conn = stub
     client.close()
     assert stub.closed and client._conn is None
+    client.close()  # idempotente: nessuna eccezione, _conn resta None
+    assert client._conn is None
 
     with _client_demo() as c:
         assert c.mode() == "DEMO"

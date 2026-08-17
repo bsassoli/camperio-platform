@@ -54,3 +54,9 @@ def test_al_inesistente_niente_report(client):
     r = client.get("/api/preview?schema=ANTASIMGEST&codcli=DEMO01&tipo=matrice&al=2026-08-13")
     d = r.get_json()
     assert d["ok"] is True and "non viene prodotto" in d["html"]
+
+
+def test_download_cliente_pdf(client):
+    r = client.get("/download?schema=ANTASIMGEST&codcli=DEMO01&tipo=cliente1")
+    assert r.status_code == 200
+    assert r.data[:5] == b"%PDF-"

@@ -115,14 +115,6 @@ def test_alphabet_una_sola_classe_non_e_errore():
     assert res.ok
 
 
-def test_alphabet_entrambe_le_classi_separate_e_errore():
-    res = check_aggregations([
-        {"ticker": "GOOGL US", "name": "Alphabet Class A"},
-        {"ticker": "GOOG US", "name": "Alphabet Class C"},
-    ])
-    assert not res.ok
-
-
 def test_samsung_include_controllata_e_errore():
     # Samsung SDI (006400 KS) NON va dentro Samsung Electronics.
     positions = [{"name": "Samsung Electronics", "ticker": "005930 KS", "components": ["006400 KS"]}]

@@ -10,6 +10,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURES = os.path.join(HERE, "fixtures")
 
 
+def _load_env_file():
+    p = os.path.join(HERE, "config.env")
+    if os.path.exists(p):
+        for line in open(p, encoding="utf-8"):
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip())
+_load_env_file()
+
+
 def _default_repo():
     """Repository file fondi/ETF: sotto CAMPERIO_DATA in LIVE (spec §8), locale in DEMO."""
     c = _cfg.from_env()
@@ -39,16 +50,6 @@ ETF_URLS = {
  "EXS1": "https://www.ishares.com/it/investitori-professionali/it/prodotti/251464/ishares-dax-ucits-etf-de-fund/1506575546154.ajax?fileType=csv&fileName=EXS1_holdings&dataType=fund",
  "EUE":  "https://www.ishares.com/it/investitori-professionali/it/prodotti/251781/ishares-euro-stoxx-50-ucits-etf-inc-fund/1506575546154.ajax?fileType=csv&fileName=EUE_holdings&dataType=fund",
 }
-
-def _load_env_file():
-    p = os.path.join(HERE, "config.env")
-    if os.path.exists(p):
-        for line in open(p, encoding="utf-8"):
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip())
-_load_env_file()
 
 # ---------------- riconoscimento fondo+data dal contenuto Excel ----------------
 def parse_fund_excel(path):

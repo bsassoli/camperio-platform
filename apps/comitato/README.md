@@ -7,7 +7,7 @@ deterministico (voce 18) su Matrice Valutaria e Sintesi Comitato.
 
 ## Avvio locale (DEMO)
 
-    .venv/bin/pip install -e ".[comitato]" 2>/dev/null || .venv/bin/pip install Flask python-docx openpyxl reportlab matplotlib
+    .venv/bin/pip install -e ".[comitato]"
     cd apps/comitato && ../../.venv/bin/python app.py
     # http://127.0.0.1:5001 — contratto sintetico DEMO01
 

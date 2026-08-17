@@ -2,13 +2,14 @@
 """Comitato Investimenti - app interattiva analisi portafogli Camperio SIM.
 Report: Matrice Valutaria, Titoli lordo/netto vs benchmark, Pesi e scostamenti.
 Date DAL/AL libere (calendario): AL deve esistere (altrimenti niente report), DAL flessibile con avviso."""
-import os, tempfile, datetime
+import os, tempfile, datetime, html
 from flask import Flask, render_template, request, jsonify, send_file, Response
 import data_layer as DL
 import lookthrough as L
 import report_comitato as RC
 import report_cliente as RCLI
 from camperio_core.portfolio.validation import validate_report
+from camperio_core.oracle.client import OracleIndisponibileError
 
 
 def _controlla_matrice(m):
@@ -91,17 +92,18 @@ def download_etf_route():
     return jsonify(ok=bool(ok), msg=msg, dettaglio=res)
 
 def _report_html(tipo, pf):
-    if tipo in ("matrice", "comitato"):
+    if tipo in ("matrice", "comitato", "cliente1"):
         m = L.build_matrix(pf, DL.REPO)
         gate = _controlla_matrice(m)
         if not gate.ok:
             return _blocco_html(gate)
         if tipo == "matrice":
             return L.matrice_html(m)
-        return RC.comitato_html(RC.build_comitato(pf, DL.REPO))
+        if tipo == "comitato":
+            return RC.comitato_html(RC.build_comitato(pf, DL.REPO))
+        return RCLI.cliente_html(RCLI.build_cliente(pf, DL.REPO))
     if tipo == "titoli":  return L.titoli_html(L.build_titoli(pf, DL.REPO))
     if tipo == "variazioni": return L.variazioni_html(L.build_variazioni(pf, DL.REPO))
-    if tipo == "cliente1": return RCLI.cliente_html(RCLI.build_cliente(pf, DL.REPO))
     return '<div class="note err">Tipo report non disponibile.</div>'
 
 @app.route("/api/preview")
@@ -110,16 +112,16 @@ def api_preview():
     tipo = request.args.get("tipo", "matrice")
     rp = DL.resolve_period(schema, codcli, request.args.get("dal") or None, request.args.get("al") or None)
     if not rp["ok"]:
-        return jsonify(ok=True, html='<div class="note err">' + rp["error"] + '</div>')
+        return jsonify(ok=True, html='<div class="note err">' + html.escape(rp["error"]) + '</div>')
     try:
         pf = DL.get_portfolio(schema, codcli, dal=rp["dal"], al=rp["al"])
-        html = _report_html(tipo, pf)
+        rep_html = _report_html(tipo, pf)
         if rp.get("warn"):
-            html = '<div class="note">&#9888; ' + rp["warn"] + '</div>' + html
-        return jsonify(ok=True, html=html)
+            rep_html = '<div class="note">&#9888; ' + html.escape(rp["warn"]) + '</div>' + rep_html
+        return jsonify(ok=True, html=rep_html)
     except Exception as e:
         import traceback; traceback.print_exc()
-        return jsonify(ok=False, html='<div class="note err">Errore: ' + str(e) + '</div>')
+        return jsonify(ok=False, html='<div class="note err">Errore: ' + html.escape(str(e)) + '</div>')
 
 @app.route("/download")
 def download():
@@ -133,7 +135,7 @@ def download():
     if not rp["ok"]:
         return Response(rp["error"], status=409, mimetype="text/plain; charset=utf-8")
     pf = DL.get_portfolio(schema, codcli, dal=rp["dal"], al=rp["al"])
-    if tipo in ("matrice", "comitato"):
+    if tipo in ("matrice", "comitato", "cliente1"):
         gate = _controlla_matrice(L.build_matrix(pf, DL.REPO))
         if not gate.ok:
             msg = "Report bloccato dal controllo deterministico: " + \
@@ -156,7 +158,13 @@ def download():
         RCLI.cliente_pdf(RCLI.build_cliente(pf, DL.REPO), path)
     return send_file(path, as_attachment=True, download_name=os.path.basename(path))
 
+@app.errorhandler(OracleIndisponibileError)
+def _oracle_giu(e):
+    return Response("Oracle non raggiungibile con configurazione LIVE: " + str(e),
+                    status=503, mimetype="text/plain; charset=utf-8")
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5001"))
     print("\n  Comitato Camperio - " + DL.mode() + " - build " + BUILD + " - http://127.0.0.1:" + str(port) + "\n", flush=True)
-    app.run(host="0.0.0.0", port=port, debug=False)
+    # il contratto di piattaforma non espone mai l'app direttamente; HOST=0.0.0.0 esplicito per il vecchio deploy Windows
+    app.run(host=os.getenv("HOST", "127.0.0.1"), port=port, debug=False)

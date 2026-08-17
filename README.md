@@ -13,6 +13,8 @@ sintetiche — è il contratto di piattaforma: si sviluppa sul Mac senza Oracle.
     python3 -m venv .venv && .venv/bin/pip install pytest
     .venv/bin/python -m pytest
 
+Per lavorare sull'app Comitato: `.venv/bin/pip install -e ".[comitato]"`.
+
 Configurazione: solo variabili d'ambiente via `camperio_core.config` —
 vedi `camperio.example.env` e `docs/SECRETS.md`. Tutto in italiano.
 

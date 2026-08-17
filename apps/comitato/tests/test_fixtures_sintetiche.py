@@ -1,4 +1,7 @@
-"""Nessun dato reale nelle fixture dell'app: ogni codcli/codabi è sintetico."""
+"""Nessun dato reale nelle fixture dell'app: ogni codcli e' sintetico, e i nomi
+file ammessi sono limitati a un'allowlist. I codabi NON sono controllati qui:
+sono chiavi interne del motore di look-through (codici titolo/fondo), non
+identificativi di cliente — non ci si aspetta che comincino per DEMO."""
 import json
 from pathlib import Path
 
@@ -26,7 +29,7 @@ def test_fixture_esistono_e_sono_sintetiche():
             assert str(cod).startswith("DEMO"), f"{f.name}: codcli {cod!r} non sintetico"
 
 
-def test_nessun_file_dati_reali_tra_le_fixture():
-    reali = [p.name for p in Path(DL.FIXTURES).iterdir()
-             if p.suffix.lower() in (".xlsx", ".xls", ".csv", ".pdf")]
-    assert reali == []
+def test_solo_file_ammessi_tra_le_fixture():
+    for p in Path(DL.FIXTURES).iterdir():
+        ammesso = p.name == "contratti.json" or (p.suffix == ".json" and p.stem.startswith("DEMO"))
+        assert ammesso, f"{p.name}: nome file non ammesso tra le fixture (allowlist: contratti.json o DEMO*.json)"

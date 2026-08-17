@@ -12,3 +12,5 @@ config.env
 *.pdf
 data/
 outputs/
+camperio_platform.egg-info/
+*.egg-info/

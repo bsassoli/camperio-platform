@@ -1,0 +1,25 @@
+{
+  "nav_al": 10130000.0, "nav_dal": 10050000.0, "nav_base": 9800000.0,
+  "tcli_al": 105.0, "tcli_dal": 104.1, "tcli_base": 100.0,
+  "tbmk_al": 103.8, "tbmk_dal": 103.2, "tbmk_base": 100.0,
+  "bench": "BM 60/40 GLOBALE", "der_eq": -492957.0,
+  "deriv_pos": [
+    {"nome": "S&P 500 FUTURE SET26 (SHORT)", "isin": "", "valorefut": -492957.0, "valmer": 0.0},
+    {"nome": "IL CALL US ULTRA 10Y", "isin": "", "valorefut": 300000.0, "valmer": 30000.0}
+  ],
+  "comp": [
+    {"macro": "Fondo DELTA UCITS", "val_al": 1500000.0, "val_dal": 1480000.0},
+    {"macro": "Fondo Superdiscovery", "val_al": 800000.0, "val_dal": 790000.0},
+    {"macro": "Fondo Alpha Green", "val_al": 500000.0, "val_dal": 495000.0},
+    {"macro": "Fondo Delta Defensive", "val_al": 400000.0, "val_dal": 400000.0},
+    {"macro": "Obbligazioni", "val_al": 2500000.0, "val_dal": 2492000.0},
+    {"macro": "Oro fisico", "val_al": 500000.0, "val_dal": 488000.0},
+    {"macro": "Azioni ed ETF azionari", "val_al": 3600000.0, "val_dal": 3577000.0},
+    {"macro": "Liquidita", "val_al": 280000.0, "val_dal": 278000.0},
+    {"macro": "Derivati e altro", "val_al": 50000.0, "val_dal": 50000.0}
+  ],
+  "trades": [
+    {"nome": "NVIDIA CORP", "verso": "Acquisto", "qty": 300.0, "prezzo": 120.5, "data": "2026-08-11", "ctv": 36150.0},
+    {"nome": "BUONI POLIENNALI DEL TES 3.85% 01-SET-2035", "verso": "Vendita", "qty": 100000.0, "prezzo": 101.2, "data": "2026-08-12", "ctv": 101200.0}
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "nav": 10130000.0, "dal": "2026-08-07", "al": "2026-08-14",
+  "rows": [
+    {"codabi": "DEM001", "nome": "APPLE INC", "divi": "001", "ccy": "USD", "qty": 4000.0, "loc_dal": 228.0, "loc_al": 232.5, "fx_dal": 1.095, "fx_al": 1.1, "qty_al": 4000.0},
+    {"codabi": "DEM002", "nome": "MICROSOFT CORP", "divi": "001", "ccy": "USD", "qty": 1300.0, "loc_dal": 505.0, "loc_al": 498.0, "fx_dal": 1.095, "fx_al": 1.1, "qty_al": 1300.0},
+    {"codabi": "DEM003", "nome": "NVIDIA CORP", "divi": "001", "ccy": "USD", "qty": 3300.0, "loc_dal": 118.0, "loc_al": 124.0, "fx_dal": 1.095, "fx_al": 1.1, "qty_al": 3300.0},
+    {"codabi": "DEM004", "nome": "SAP SE", "divi": "000", "ccy": "EUR", "qty": 2400.0, "loc_dal": 205.0, "loc_al": 208.0, "fx_dal": 1.0, "fx_al": 1.0, "qty_al": 2400.0},
+    {"codabi": "DEM005", "nome": "NESTLE SA", "divi": "003", "ccy": "CHF", "qty": 3400.0, "loc_dal": 92.0, "loc_al": 90.0, "fx_dal": 0.935, "fx_al": 0.93, "qty_al": 3400.0},
+    {"codabi": "DEM006", "nome": "SAMSUNG ELECTRONICS GDR", "divi": "001", "ccy": "USD", "qty": 200.0, "loc_dal": 1350.0, "loc_al": 1390.0, "fx_dal": 1.095, "fx_al": 1.1, "qty_al": 200.0},
+    {"codabi": "DEM007", "nome": "NOVO NORDISK A/S", "divi": "007", "ccy": "DKK", "qty": 2500.0, "loc_dal": 445.0, "loc_al": 440.0, "fx_dal": 7.46, "fx_al": 7.46, "qty_al": 2500.0}
+  ]
+}

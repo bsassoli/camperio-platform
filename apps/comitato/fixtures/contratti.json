@@ -1,0 +1,4 @@
+[
+  {"schema": "ANTASIMGEST", "codcli": "DEMO01", "descli": "Portafoglio Demo Gestione", "tipoge": "CMR", "linea": "Camperio"},
+  {"schema": "ANTASIMN", "codcli": "DEMO02", "descli": "Portafoglio Demo RTO", "tipoge": "RTO", "linea": "RTO"}
+]

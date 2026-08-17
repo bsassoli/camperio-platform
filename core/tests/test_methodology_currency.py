@@ -43,3 +43,19 @@ def test_bond_da_descrizione():
 
 def test_default_prudenziale_eur():
     assert currency_of({"grutit": "A10", "des": "TITOLO IGNOTO"}) == "EUR"
+
+
+def test_caratterizzazione_etf_senza_ticker_domicilio_irlandese_va_in_eur():
+    # Limite noto: un ETF a esposizione USD ma domiciliato IE, senza ticker
+    # Bloomberg, finisce in EUR via ISIN. Il look-through del piano 3 dovrà
+    # emettere un warning per le posizioni che cadono qui.
+    assert currency_of({"grutit": "H14", "isin": "IE00B4WXJJ64"}) == "EUR"
+
+
+def test_caratterizzazione_liquidita_chf_va_in_eur():
+    # La regola Z gestisce solo USD/EUR: un conto CHF oggi finisce in EUR.
+    assert currency_of({"grutit": "Z01", "des": "CONTO CORRENTE CHF"}) == "EUR"
+
+
+def test_caratterizzazione_tag_valuta_vale_anche_per_azioni():
+    assert currency_of({"grutit": "E01", "des": "FONDO SPECIALE (USD) CLASSE A"}) == "USD"

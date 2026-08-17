@@ -111,3 +111,18 @@ def test_live_mappa_le_righe_in_dict(monkeypatch):
     assert rows == [{"CODCLI": "X1", "DESCLI": "Cliente"}]
     assert stub_conn.cursor_stub.execute_args == ("SELECT CODCLI, DESCLI FROM X", {})
     assert stub_conn.cursor_stub.closed is True
+
+
+def test_close_e_context_manager():
+    class _StubConn:
+        def __init__(self): self.closed = False
+        def close(self): self.closed = True
+
+    stub = _StubConn()
+    client = _client_demo()
+    client._conn = stub
+    client.close()
+    assert stub.closed and client._conn is None
+
+    with _client_demo() as c:
+        assert c.mode() == "DEMO"

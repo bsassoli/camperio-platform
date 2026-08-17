@@ -108,10 +108,19 @@ def test_alphabet_non_aggregato_e_errore():
     assert not res.ok
 
 
-def test_alphabet_aggregato_ok():
-    positions = [{"name": "Alphabet", "ticker": "GOOGL US", "aggregates": ["GOOG US"]}]
-    res = check_aggregations(positions)
+def test_alphabet_una_sola_classe_non_e_errore():
+    # check_aggregations segnala solo la compresenza di GOOGL US e GOOG US
+    # come posizioni separate; una sola classe in portafoglio è legittima.
+    res = check_aggregations([{"ticker": "GOOGL US", "name": "Alphabet Inc"}])
     assert res.ok
+
+
+def test_alphabet_entrambe_le_classi_separate_e_errore():
+    res = check_aggregations([
+        {"ticker": "GOOGL US", "name": "Alphabet Class A"},
+        {"ticker": "GOOG US", "name": "Alphabet Class C"},
+    ])
+    assert not res.ok
 
 
 def test_samsung_include_controllata_e_errore():

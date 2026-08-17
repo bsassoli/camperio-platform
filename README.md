@@ -15,3 +15,10 @@ sintetiche — è il contratto di piattaforma: si sviluppa sul Mac senza Oracle.
 
 Configurazione: solo variabili d'ambiente via `camperio_core.config` —
 vedi `camperio.example.env` e `docs/SECRETS.md`. Tutto in italiano.
+
+## Convenzione di lingua
+
+La prosa (commenti, docstring, documenti, commit) è in italiano; gli
+identificatori restano quelli dei sorgenti validati dall'uso (`eur`, `macro`,
+`currency_of`, `check_*`, …), in inglese o italiano come nascono. Non si
+traducono API esistenti a metà.

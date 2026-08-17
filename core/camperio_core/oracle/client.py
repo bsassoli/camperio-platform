@@ -64,3 +64,18 @@ class OracleClient:
         finally:
             cur.close()
         return rows
+
+    def close(self):
+        """Chiude la connessione se aperta (idempotente)."""
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            finally:
+                self._conn = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+        return False

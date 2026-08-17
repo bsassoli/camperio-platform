@@ -1,0 +1,7 @@
+# Solo sviluppo locale: `docker compose -f docker-compose.yml -f compose.demo.yml up -d comitato`
+services:
+  comitato:
+    environment:
+      COMITATO_AUTH: "0"
+    ports:
+      - "127.0.0.1:5001:5001"

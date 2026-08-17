@@ -1,0 +1,50 @@
+# Piattaforma Camperio — runtime in container (ADR 0010).
+# Produzione: `systemctl start camperio` (unit in systemd/) → compose up -d.
+# I segreti vivono in /etc/camperio/camperio.env (root, 600) — mai nel repo.
+name: camperio
+
+services:
+  comitato:
+    build:
+      context: ..
+      dockerfile: deploy/comitato/Dockerfile
+    image: camperio/comitato:latest
+    restart: unless-stopped
+    env_file:
+      - path: /etc/camperio/camperio.env
+        required: false      # sul Mac non esiste: si parte in DEMO
+    environment:
+      COMITATO_AUTH: "1"     # dietro nginx l'utente arriva sempre dagli header
+      CAMPERIO_DATA: /var/lib/camperio
+    volumes:
+      - camperio-data:/var/lib/camperio
+    # nessuna porta pubblicata: raggiungibile solo dalla rete compose (nginx)
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    restart: unless-stopped
+    env_file:
+      - path: /etc/camperio/camperio.env
+        required: false
+    environment:
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"   # espone X-Auth-Request-User/-Groups su /auth
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"          # l'autorizzazione e' per gruppi Entra, non per dominio email
+      OAUTH2_PROXY_OIDC_GROUPS_CLAIM: groups
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - comitato
+      - oauth2-proxy
+    ports:
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/camperio/tls:/etc/camperio/tls:ro       # fullchain.pem + privkey.pem (AD CS)
+      - camperio-data:/var/lib/camperio:ro           # per servire output/ statico
+
+volumes:
+  camperio-data:

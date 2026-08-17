@@ -1,0 +1,5 @@
+[
+  {"SCHEMA": "ANTASIMGEST", "CODCLI": "DEMO01", "DESCLI": "Portafoglio Demo Gestione", "TIPOGE": "CMR"},
+  {"SCHEMA": "ANTASIMN", "CODCLI": "DEMO02", "DESCLI": "Portafoglio Demo Consulenza", "TIPOGE": "L01"},
+  {"SCHEMA": "ANTASIMN", "CODCLI": "DEMO03", "DESCLI": "Portafoglio Demo RTO", "TIPOGE": "RTO"}
+]

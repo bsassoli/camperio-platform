@@ -8,6 +8,21 @@ import data_layer as DL
 import lookthrough as L
 import report_comitato as RC
 import report_cliente as RCLI
+from camperio_core.portfolio.validation import validate_report
+
+
+def _controlla_matrice(m):
+    """Cancello deterministico (voce 18): matrice FX + oro deve tornare col NAV.
+    Con ERROR il report non esce; i WARNING si riportano ma non bloccano."""
+    fx = dict(m["gran_tot"])
+    fx["Oro"] = m["oro"]
+    return validate_report({"nav": m["nav"], "fx": fx})
+
+
+def _blocco_html(res):
+    righe = "".join("<li>" + f.code + ": " + f.message + "</li>" for f in res.errors)
+    return ('<div class="note err"><b>Report bloccato dal controllo deterministico</b> — '
+            "i numeri non tornano e il report non viene emesso.<ul>" + righe + "</ul></div>")
 
 app = Flask(__name__)
 BUILD = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -76,10 +91,16 @@ def download_etf_route():
     return jsonify(ok=bool(ok), msg=msg, dettaglio=res)
 
 def _report_html(tipo, pf):
-    if tipo == "matrice": return L.matrice_html(L.build_matrix(pf, DL.REPO))
+    if tipo in ("matrice", "comitato"):
+        m = L.build_matrix(pf, DL.REPO)
+        gate = _controlla_matrice(m)
+        if not gate.ok:
+            return _blocco_html(gate)
+        if tipo == "matrice":
+            return L.matrice_html(m)
+        return RC.comitato_html(RC.build_comitato(pf, DL.REPO))
     if tipo == "titoli":  return L.titoli_html(L.build_titoli(pf, DL.REPO))
     if tipo == "variazioni": return L.variazioni_html(L.build_variazioni(pf, DL.REPO))
-    if tipo == "comitato": return RC.comitato_html(RC.build_comitato(pf, DL.REPO))
     if tipo == "cliente1": return RCLI.cliente_html(RCLI.build_cliente(pf, DL.REPO))
     return '<div class="note err">Tipo report non disponibile.</div>'
 
@@ -112,6 +133,12 @@ def download():
     if not rp["ok"]:
         return Response(rp["error"], status=409, mimetype="text/plain; charset=utf-8")
     pf = DL.get_portfolio(schema, codcli, dal=rp["dal"], al=rp["al"])
+    if tipo in ("matrice", "comitato"):
+        gate = _controlla_matrice(L.build_matrix(pf, DL.REPO))
+        if not gate.ok:
+            msg = "Report bloccato dal controllo deterministico: " + \
+                  "; ".join(f.message for f in gate.errors)
+            return Response(msg, status=409, mimetype="text/plain; charset=utf-8")
     d = pf["meta"]["data"]; safe = codcli.replace("/", "_")
     base = LABEL[tipo].replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "") + "_" + safe + "_" + str(d)
     tmp = tempfile.gettempdir()

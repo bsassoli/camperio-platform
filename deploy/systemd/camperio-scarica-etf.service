@@ -1,0 +1,11 @@
+# Scarica i 9 CSV holdings ETF da iShares nel repository fondi (gia' oggi
+# schedulato il giovedi' alle 11 sul PC di Edoardo — questo lo sostituisce).
+[Unit]
+Description=Camperio - download CSV ETF benchmark (iShares)
+Requires=camperio.service
+After=camperio.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/camperio/deploy
+ExecStart=/usr/bin/docker compose run --rm comitato python scarica_etf.py

@@ -1,0 +1,10 @@
+[Unit]
+Description=Camperio - timer download ETF (giovedi' 11:00)
+
+[Timer]
+OnCalendar=Thu *-*-* 11:00:00
+Persistent=true
+# Persistent=true: se la VM era spenta all'orario, il run perso parte al riavvio.
+
+[Install]
+WantedBy=timers.target

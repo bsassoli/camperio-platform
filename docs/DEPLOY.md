@@ -89,7 +89,7 @@ risponde 403/404 finché nessun job ha ancora scritto file: è atteso, non un mo
 - [ ] test di hardening verdi — sul host di sviluppo/WSL: `.venv/bin/python -m pytest apps/comitato/tests/test_hardening.py` (l'immagine non contiene pytest)
 - [ ] gate provato su snapshot reale (sezione 2)
 - [ ] nessuna porta pubblicata oltre 443 (`docker compose ps`, `ss -tlnp`)
-- [ ] `/etc/camperio/camperio.env` root 600; niente segreti nei log (`docker compose logs | grep -i secret` vuoto)
+- [ ] `/etc/camperio/camperio.env` root:docker 640; niente segreti nei log (`docker compose logs | grep -i secret` vuoto)
 - [ ] gruppi Entra nel token verificati con un utente reale (matrice app→gruppo, voce 3)
 
 ## 5 · Rollback

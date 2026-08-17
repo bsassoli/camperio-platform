@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# ambiente locale — mai segreti nel repo (spec §7)
+.env
+config.env
+# mai dati clienti nel repo
+*.xlsx
+*.xls
+*.csv
+*.pdf
+data/
+outputs/

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comitato Investimenti - Analisi Portafogli Camperio</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ build }}">
+</head><body>
+<header>
+  <div class="hwrap">
+    <img class="logo" src="{{ url_for('static', filename='logo-bianco.svg') }}" alt="Camperio SIM">
+    <div class="htitle">
+      <div class="h1">Comitato Investimenti - Analisi Portafogli</div>
+      <div class="h2">Portafoglio - periodo (Dal / Al) - tipo report &nbsp;|&nbsp; <b>build {{ build }}</b></div>
+    </div>
+    <div style="text-align:right">
+      <div class="mode {{ 'live' if mode=='LIVE' else 'demo' }}">{{ 'LIVE - Oracle' if mode=='LIVE' else 'DEMO - dati in cache' }}</div>
+      {% if utente %}<div style="font-size:11px;color:#fff;opacity:.85;margin-top:6px">Utente: <b>{{ utente }}</b></div>{% endif %}
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="side">
+    <section class="panel">
+      <h4>Dati di mercato caricati</h4>
+      <div id="repostatus"><div class="placeholder" style="padding:14px 0">Verifica in corso...</div></div>
+      <button id="dletf" class="btn alt" style="width:100%;margin-top:12px">Aggiorna ETF ora (da iShares)</button>
+      <div id="etfmsg" class="up-msg"></div>
+      <div class="upinfo">Download automatico programmato: ogni gioved&igrave; alle 11:00.</div>
+    </section>
+    <section class="panel">
+      <h4>Carica file fondi UCITS</h4>
+      <label class="drop" id="drop">Trascina qui i file oppure <b>clicca per selezionare</b>
+        <input id="file" type="file" multiple accept=".xlsx,.xls,.csv" style="display:none"></label>
+      <div class="upinfo">Formati: .xlsx .xls .csv - naming consigliato <b>FONDO_AAAA-MM-GG.xlsx</b></div>
+      <div id="upmsg" class="up-msg"></div>
+    </section>
+  </aside>
+
+  <main>
+    <section class="panel">
+      <div class="controls">
+        <div class="cgroup">
+          <div class="cghead"><span class="cgnum">1</span> Portafoglio</div>
+          <div class="crow">
+            <div class="fld"><label>Gestione</label>
+              <select id="c_gest" class="csel"><option value="">— seleziona —</option>
+                {% for c in contratti if c.gruppo=='Gestione' %}<option value="{{ c.schema }}|{{ c.codcli }}">{{ c.codcli }} - {{ c.descli }}</option>{% endfor %}
+              </select></div>
+            <div class="fld"><label>Consulenza</label>
+              <select id="c_cons" class="csel"><option value="">— seleziona —</option>
+                {% for c in contratti if c.gruppo=='Consulenza' %}<option value="{{ c.schema }}|{{ c.codcli }}">{{ c.codcli }} - {{ c.descli }}</option>{% endfor %}
+              </select></div>
+            <div class="fld"><label>RTO</label>
+              <select id="c_rto" class="csel"><option value="">— seleziona —</option>
+                {% for c in contratti if c.gruppo=='RTO' %}<option value="{{ c.schema }}|{{ c.codcli }}">{{ c.codcli }} - {{ c.descli }}</option>{% endfor %}
+              </select></div>
+          </div>
+        </div>
+        <div class="crow2">
+          <div class="cgroup cg-per">
+            <div class="cghead"><span class="cgnum">2</span> Periodo</div>
+            <div class="crow">
+              <div class="fld"><label>Dal</label><input type="date" id="dal"></div>
+              <div class="fld"><label>Al</label><input type="date" id="al"></div>
+            </div>
+          </div>
+          <div class="cgroup cg-rep">
+            <div class="cghead"><span class="cgnum">3</span> Report</div>
+            <div class="crow">
+              <div class="fld"><label>Comitato</label>
+                <select id="tipo"><option value="">— nessuno —</option>{% for k,v in tipi.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+              <div class="fld"><label>Cliente</label>
+                <select id="tipocli"><option value="">— nessuno —</option>{% for k,v in tipi_cli.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+            </div>
+          </div>
+        </div>
+        <div class="cbar">
+          <button id="gen" class="btn btn-lg">Genera anteprima</button>
+          <a id="dlx" class="btn alt btn-lg" href="#">Scarica</a>
+        </div>
+      </div>
+      <div class="upinfo">Date libere a calendario. <b>Al</b>: se non ci sono dati a quella data il report non viene prodotto. <b>Dal</b>: se manca, uso l'ultima disponibile e avviso.</div>
+      <div id="preview" class="preview">
+        <div class="placeholder">Seleziona portafoglio, periodo (Dal/Al) e tipo report, poi premi <b>Genera anteprima</b>.</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer><div class="fwrap">
+  <div>Documento riservato - uso interno Camperio SIM S.p.A. - Comitato Investimenti</div>
+  <div>Via Camperio, 9 - 20123 Milano - Tel +39-02 30322100 - camperioSIM@camperio.net - www.camperiosim.com</div>
+  <div class="small">Consob - delibera n. 11761 del 22/12/1998 - albo n. 48 - C.F. 02342760275 - P.IVA 11791000158 - Cod. Banca d'Italia 16206/5 - FNG SIM0077</div>
+</div></footer>
+
+<script>
+const $ = s => document.querySelector(s);
+const CSEL=["#c_gest","#c_cons","#c_rto"];
+function pf(){ for(const s of CSEL){ const v=$(s).value; if(v){ const p=v.split("|"); return {schema:p[0],codcli:p[1]}; } } return {schema:"",codcli:""}; }
+function activeTipo(){ const tc=$("#tipocli"); const c=tc?tc.value:""; return c || $("#tipo").value; }
+function params(){ const p=pf(); return {...p, dal:$("#dal").value, al:$("#al").value, tipo:activeTipo()}; }
+function isoMinus(iso, days){ const d=new Date(iso); d.setDate(d.getDate()-days); return d.toISOString().slice(0,10); }
+async function loadDates(){
+  const {schema,codcli}=pf();
+  if(!codcli){ syncLinks(); return; }
+  try{
+    const r=await fetch("/api/dates?schema="+schema+"&codcli="+encodeURIComponent(codcli));
+    const d=await r.json();
+    if(d && d.length){ $("#al").value=d[0]; $("#dal").value = d[1] || isoMinus(d[0],7); if($("#al").max!==undefined) $("#al").max=d[0]; }
+  }catch(e){}
+  syncLinks();
+}
+function syncLinks(){
+  const p=params(); const t=p.tipo;
+  const qs="schema="+p.schema+"&codcli="+encodeURIComponent(p.codcli)+"&dal="+p.dal+"&al="+p.al+"&tipo="+t;
+  const fmt = (t.indexOf("cliente")===0)?"pdf":((t==="comitato")?"word":"excel");
+  $("#dlx").href="/download?"+qs+"&fmt="+fmt;
+  $("#dlx").textContent = (fmt==="pdf")?"PDF":((fmt==="word")?"Word":"Excel");
+}
+async function generate(){
+  const p=params(); syncLinks();
+  if(!p.tipo){ $("#preview").innerHTML='<div class="note err">Seleziona un report: Comitato oppure Cliente.</div>'; return; }
+  if(!p.al){ $("#preview").innerHTML='<div class="note err">Seleziona la data Al.</div>'; return; }
+  $("#preview").innerHTML='<div class="placeholder">Generazione in corso...</div>';
+  const r=await fetch("/api/preview?schema="+p.schema+"&codcli="+encodeURIComponent(p.codcli)+"&dal="+p.dal+"&al="+p.al+"&tipo="+p.tipo);
+  const j=await r.json(); $("#preview").innerHTML=j.html;
+}
+async function loadRepo(){
+  const r=await fetch("/api/repo-status"); const d=await r.json();
+  const grp=(titolo,items)=>{
+    let h='<div class="subttl">'+titolo+'</div>';
+    items.forEach(it=>{
+      const ok=it.loaded;
+      h+='<div class="repo-item"><div><div class="repo-name">'+it.nome+'</div>'+
+         (ok?'<div class="repo-date">'+it.file+'</div>':'<div class="repo-date">'+it.atteso+'</div>')+
+         '</div><span class="badge '+(ok?'ok':'ko')+'">'+(ok?(it.data||'Caricato'):'Mancante')+'</span></div>';
+    });
+    return h;
+  };
+  $("#repostatus").innerHTML=grp("Fondi UCITS",d.fondi)+grp("ETF benchmark",d.etf);
+}
+async function upload(files){
+  if(!files.length) return;
+  const fd=new FormData(); for(const f of files) fd.append("file",f);
+  $("#upmsg").className="up-msg"; $("#upmsg").textContent="Caricamento...";
+  try{
+    const r=await fetch("/upload",{method:"POST",body:fd}); const j=await r.json();
+    $("#upmsg").className="up-msg "+(j.ok?"ok":"ko"); $("#upmsg").textContent=j.msg; loadRepo();
+  }catch(e){ $("#upmsg").className="up-msg ko"; $("#upmsg").textContent="Errore caricamento."; }
+}
+async function dlEtf(){
+  $("#etfmsg").className="up-msg"; $("#etfmsg").textContent="Scaricamento ETF in corso (puo' richiedere qualche secondo)...";
+  try{
+    const r=await fetch("/download-etf",{method:"POST"}); const j=await r.json();
+    $("#etfmsg").className="up-msg "+(j.ok?"ok":"ko"); $("#etfmsg").textContent=j.msg; loadRepo();
+  }catch(e){ $("#etfmsg").className="up-msg ko"; $("#etfmsg").textContent="Errore download ETF."; }
+}
+CSEL.forEach(s=>$(s).addEventListener("change", ()=>{ CSEL.forEach(o=>{ if(o!==s) $(o).value=""; }); loadDates(); }));
+["#dal","#al"].forEach(s=>$(s).addEventListener("change", syncLinks));
+$("#tipo").addEventListener("change", ()=>{ const tc=$("#tipocli"); if(tc) tc.value=""; syncLinks(); });
+$("#tipocli").addEventListener("change", ()=>{ $("#tipo").value=""; syncLinks(); });
+$("#gen").addEventListener("click", generate);
+$("#dletf").addEventListener("click", dlEtf);
+const drop=$("#drop"), file=$("#file");
+drop.addEventListener("click",()=>file.click());
+file.addEventListener("change",()=>upload(file.files));
+drop.addEventListener("dragover",e=>{e.preventDefault();drop.style.borderColor="#151F6D";});
+drop.addEventListener("dragleave",()=>drop.style.borderColor="");
+drop.addEventListener("drop",e=>{e.preventDefault();drop.style.borderColor="";upload(e.dataTransfer.files);});
+(function(){ const g=$("#c_gest"); if(g && g.options.length>1) g.selectedIndex=1; loadDates(); })(); loadRepo();
+</script>
+</body></ht

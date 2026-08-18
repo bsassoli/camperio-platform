@@ -19,7 +19,8 @@ Configurazione: solo variabili d'ambiente via `camperio_core.config` —
 vedi `camperio.example.env` e `docs/SECRETS.md`. Tutto in italiano.
 
 Deploy: immagine, stack Compose (nginx + oauth2-proxy), unit systemd e runbook
-in `deploy/` e `docs/DEPLOY.md` (ADR 0010 del repo di pianificazione).
+in `deploy/` e `docs/DEPLOY.md` (ADR 0010 del repo di pianificazione). Cosa serve
+farsi dare dall'IT e dal DBA prima di partire: `docs/RICHIESTE-IT.md`.
 
 ## Convenzione di lingua
 

@@ -2,8 +2,11 @@
 # schedulato il giovedi' alle 11 sul PC di Edoardo — questo lo sostituisce).
 [Unit]
 Description=Camperio - download CSV ETF benchmark (iShares)
-Requires=camperio.service
-After=camperio.service
+# Dipende da docker, NON da camperio.service: `compose run --rm` si crea il suo
+# container e non ha bisogno dello stack su. Con Requires=camperio.service il job
+# rialzava l'intero stack (nginx e 443 compresi) sia al test-fire sia dopo un rollback.
+Requires=docker.service
+After=docker.service
 
 [Service]
 Type=oneshot

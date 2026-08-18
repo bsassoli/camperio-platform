@@ -4,106 +4,74 @@ Questo documento porta la piattaforma da zero a funzionante, **un passo alla vol
 Ogni passo dice tre cose: **il comando da dare**, **cosa fa**, e **cosa devi vedere**
 se è andato bene. Non serve fare deploy tutti i giorni per seguirlo.
 
-**La sequenza è obbligata**: prima si prova tutto su **WSL Ubuntu** (l'ambiente di test
-sul PC Windows, da cui Oracle è raggiungibile in sola lettura), e solo quando lì è tutto
-verde si ripete sulla **VM Elmec** (`app-ai.camperiosim.com`, la produzione). Niente
-debutta in produzione.
+**Dove si lavora:** tutto sulla **VM Elmec** (`app-ai.camperiosim.com`). Non c'è un
+ambiente di prova separato: si collauda sulla macchina di produzione *prima* che sia
+raggiungibile da chiunque.
+
+> **⚠ La regola che sostituisce l'ambiente di prova.** `nginx` è l'**unico** servizio
+> che pubblica una porta (la 443); `comitato` e `oauth2-proxy` non ne espongono nessuna.
+> Finché non alzi nginx, la VM non è raggiungibile da nessuno e si comporta a tutti gli
+> effetti da ambiente di test. Le Parti 2–5 si fanno quindi **a stack parziale**; nginx
+> si alza per ultimo, nella Parte 7, e solo a checklist verde.
+>
+> Il corollario pratico: **fino alla Parte 7 non dare mai `docker compose up -d` nudo.**
+> Senza il nome di un servizio alza tutto, nginx incluso, e apre la 443. Nei comandi qui
+> sotto c'è sempre `comitato` esplicito — non è pedanteria.
 
 **Cosa gira, in due righe** (architettura: ADR 0010 nel repo di pianificazione):
 tre container orchestrati da Docker Compose — l'app `comitato` (Flask), `oauth2-proxy`
 (il login aziendale Entra ID) e `nginx` (l'unica porta esposta, la 443) — più i job
 schedulati, lanciati non da Docker ma da **timer systemd dell'host** che eseguono
 `docker compose run`. I segreti (credenziali Oracle, certificato TLS, chiavi) **non
-sono nel repo**: li inserisce Bernardino a mano, ambiente per ambiente.
+sono nel repo**: li inserisce Bernardino a mano.
 
 ## Cosa serve avere in mano, e quando
 
 | Cosa | Da chi | Serve a partire da |
 |---|---|---|
-| Niente | — | Parte 1 e 2 (la prova DEMO gira senza alcun segreto) |
+| Accesso SSH alla VM (da VPN) | IT | Parte 1 |
+| Niente altro | — | Parte 2 (la prova DEMO gira senza alcun segreto) |
 | Utenza Oracle di servizio + service name del DSN | DBA (richiesta A1) | Parte 3 |
 | App registration Entra (client id/secret, tenant) | IT (richiesta B2) | Parte 3 |
-| Certificato AD CS per `app-ai.camperiosim.com` | IT (richiesta B1) | Parte 3 (solo stack completo) |
 | Chiave API Anthropic | Bernardino | Parte 3 |
+| Certificato AD CS per `app-ai.camperiosim.com` | IT (richiesta B1) | Parte 7 (serve solo a nginx) |
+
+Le Parti 2–5 si possono fare **senza il certificato**: se l'IT è in ritardo su B1, non
+sei bloccato — arrivi fino alla checklist e ti fermi lì.
 
 ---
 
-## Parte 1 — Preparare l'ambiente WSL
+## Parte 1 — Preparare la VM
 
-### 1.1 Entrare in Ubuntu
+### 1.1 Collegarsi
 
-Da Windows: menu Start → digita **Ubuntu** → Invio. In alternativa, apri PowerShell
-o Windows Terminal e digita `wsl`.
-
-**Cosa fa:** apre una sessione Linux dentro Windows. Tutti i comandi di questo runbook
-si danno *lì*, nel prompt Linux (riconoscibile: finisce con `$`), non in PowerShell.
-
-**Risultato atteso:** un prompt tipo `bernardino@PCNOME:~$`. Verifica con:
+Dalla rete aziendale o in VPN:
 
 ```bash
-lsb_release -d
+ssh <utente>@app-ai.camperiosim.com
 ```
 
-che deve rispondere `Ubuntu ...`.
+**Cosa fa:** apre la sessione sulla VM. Tutti i comandi di questo runbook si danno lì,
+salvo dove scritto esplicitamente il contrario (un solo caso: il tunnel del passo 4.2,
+che si lancia dal tuo PC).
 
-### 1.2 Attivare systemd in WSL
+**Risultato atteso:** un prompt Linux sulla VM.
 
-Prima controlla se è già attivo:
-
-```bash
-systemctl is-system-running
-```
-
-Se risponde `running` (o `degraded`), salta al passo 1.3. Se risponde con un errore
-tipo "System has not been booted with systemd":
-
-```bash
-sudo nano /etc/wsl.conf
-```
-
-e aggiungi (o completa) queste due righe:
-
-```ini
-[boot]
-systemd=true
-```
-
-Salva (Ctrl+O, Invio) ed esci (Ctrl+X). Poi **da PowerShell** (finestra Windows):
-
-```powershell
-wsl --shutdown
-```
-
-e riapri Ubuntu come al passo 1.1.
-
-**Cosa fa:** WSL di default non avvia systemd, il gestore dei servizi di Linux. A noi
-serve perché i job schedulati usano timer systemd, e vanno provati qui prima della VM.
-
-**Risultato atteso:** riaperta la sessione, `systemctl is-system-running` risponde
-`running` o `degraded` (entrambi vanno bene).
-
-### 1.3 Installare Docker
-
-Controlla se c'è già:
+### 1.2 Verificare Docker e l'utente di servizio
 
 ```bash
 docker --version && docker compose version
+id -nG | tr ' ' '\n' | grep -x docker
 ```
 
-Se entrambi rispondono e Compose è **≥ 2.24**, salta al passo 1.4. Altrimenti:
+**Cosa fa:** il primo comando verifica Docker Engine e Compose (serve **≥ 2.24**), già
+presenti sulla VM e verificati dai probe. Il secondo controlla che il tuo utente sia nel
+gruppo `docker`: è la ragione per cui potrai dare i comandi `docker ...` senza `sudo`, e
+per cui più avanti il file dei segreti sarà leggibile a `root:docker` con permessi `640`.
 
-```bash
-curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker $USER
-```
-
-Poi chiudi la sessione (`exit`) e rientra in Ubuntu (passo 1.1).
-
-**Cosa fa:** il primo comando installa Docker Engine e Compose con lo script ufficiale.
-Il secondo aggiunge il tuo utente al gruppo `docker`, così potrai dare i comandi
-`docker ...` senza `sudo` — serve rientrare perché i gruppi si rileggono al login.
-
-**Risultato atteso:**
+**Risultato atteso:** le due versioni, e `docker` stampato dal secondo comando. Se il
+secondo non stampa nulla: `sudo usermod -aG docker $USER`, poi esci e rientra in SSH
+(i gruppi si rileggono al login).
 
 ```bash
 docker run --rm hello-world
@@ -111,16 +79,14 @@ docker run --rm hello-world
 
 stampa "Hello from Docker!".
 
-> Sulla VM questo passo non servirà: Docker è già presente e verificato dai probe.
-
-### 1.4 Creare la deploy key per GitHub
+### 1.3 Creare la deploy key per GitHub
 
 Il repo è privato e si clona **con una chiave SSH dedicata in sola lettura** — mai con
 token personali: se la macchina viene compromessa, la chiave dà accesso a un solo repo
 e non può scriverci.
 
 ```bash
-ssh-keygen -t ed25519 -C "camperio-deploy-wsl" -f ~/.ssh/camperio_deploy -N ""
+ssh-keygen -t ed25519 -C "camperio-deploy-vm" -f ~/.ssh/camperio_deploy -N ""
 cat ~/.ssh/camperio_deploy.pub
 ```
 
@@ -129,7 +95,10 @@ che inizia con `ssh-ed25519`). Copiala.
 
 Ora su GitHub (dal browser): repo `bsassoli/camperio-platform` → **Settings** →
 **Deploy keys** → **Add deploy key** → incolla la chiave, dalle un titolo (es.
-"WSL Bernardino"), **lascia deselezionato "Allow write access"** → Add key.
+"VM app-ai"), **lascia deselezionato "Allow write access"** → Add key.
+
+> Una chiave per macchina: le chiavi non si copiano tra host. Se un domani la VM va
+> dismessa, si revoca la sua e basta.
 
 Poi di' a SSH di usare quella chiave per GitHub:
 
@@ -150,7 +119,7 @@ ssh -T git@github.com
 
 risponde "Hi bsassoli/camperio-platform! You've successfully authenticated…".
 
-### 1.5 Clonare il repo in `/opt/camperio`
+### 1.4 Clonare il repo in `/opt/camperio`
 
 ```bash
 sudo mkdir -p /opt/camperio
@@ -196,11 +165,20 @@ docker compose -f docker-compose.yml -f compose.demo.yml up -d comitato
 ```
 
 **Cosa fa:** i due `-f` sommano la configurazione base e l'override demo, che pubblica
-l'app su `127.0.0.1:5001` (solo localhost, nulla di esposto). Parte **solo** il
-container `comitato` — niente nginx, niente oauth2-proxy: per questo non servono
-certificato né Entra.
+l'app su `127.0.0.1:5001` (solo il loopback della VM: nulla di raggiungibile dalla
+rete). Parte **solo** il container `comitato` — niente nginx, niente oauth2-proxy: per
+questo non servono certificato né Entra.
 
 **Risultato atteso:** `docker compose ps` mostra `comitato` con stato `running`.
+Controprova che non hai esposto niente:
+
+```bash
+ss -tlnp | grep -E ':(443|5001)'
+```
+
+deve mostrare al massimo una riga, su `127.0.0.1:5001`. Se compare `0.0.0.0:443` o
+`*:443`, hai alzato nginx per sbaglio: `docker compose stop nginx` e rileggi la regola
+in cima al documento.
 
 ### 2.3 Verificare che sia davvero DEMO
 
@@ -212,7 +190,33 @@ curl -s http://127.0.0.1:5001/ | grep "DEMO"
 nulla, l'app è partita LIVE (v. avviso sopra) o non è partita: guarda
 `docker compose logs comitato`.
 
-### 2.4 Spegnere
+### 2.4 Far girare i test di hardening
+
+Sono i test che dimostrano che l'app rifiuta le richieste senza identità, che non
+accetta upload di estensioni arbitrarie e che non riflette HTML. Sono una voce della
+checklist di esposizione (Parte 6), quindi conviene vederli verdi subito.
+
+```bash
+cd /opt/camperio/deploy
+docker compose run --rm -T \
+  -v /opt/camperio/apps/comitato/tests:/opt/camperio/apps/comitato/tests:ro \
+  comitato sh -c "pip install --no-cache-dir pytest >/dev/null && python -m pytest tests/test_hardening.py"
+```
+
+**Cosa fa:** l'immagine di produzione **non contiene pytest** e `.dockerignore` esclude
+`tests/` dal build — entrambe scelte volute, non si spedisce l'attrezzatura di test in
+produzione. Quindi si monta la cartella dei test in sola lettura in un container
+usa-e-getta (`--rm`) e si installa pytest solo lì dentro, per la durata del comando.
+
+**Risultato atteso:** l'ultima riga di pytest dice `N passed`.
+
+> Se la VM non raggiunge PyPI l'installazione fallisce. Alternativa senza rete:
+> `python3 -m venv /tmp/pytest-venv && /tmp/pytest-venv/bin/pip install pytest flask
+> python-docx openpyxl`, poi lanciare i test con
+> `PYTHONPATH=/opt/camperio/core:/opt/camperio/apps/comitato`. È più lavoro: prova
+> prima la via del container.
+
+### 2.5 Spegnere
 
 ```bash
 docker compose -f docker-compose.yml -f compose.demo.yml down
@@ -220,9 +224,8 @@ docker compose -f docker-compose.yml -f compose.demo.yml down
 
 ---
 
-## Parte 3 — Segreti e certificato (manuale, per ambiente)
+## Parte 3 — Segreti e certificato (manuale)
 
-Ogni ambiente (WSL, poi VM) ha i **suoi** valori: non si copiano da uno all'altro.
 Consegna dei valori: **mai per email** — Passwordstate o di persona (v. `docs/SECRETS.md`).
 
 ### 3.1 Creare il file dei segreti
@@ -261,12 +264,11 @@ Scommenta e compila, riga per riga:
 
 > **⚠ `OAUTH2_PROXY_ALLOWED_GROUPS` è obbligatorio.** Senza, *qualunque* account del
 > tenant Camperio entra nell'app dopo il login. È la prima voce della checklist di
-> esposizione (Parte 6).
+> esposizione (Parte 6) e il primo dei controlli pre-flight (6.1).
 
 ### 3.3 Installare il certificato TLS
 
-Serve solo per lo stack completo con nginx (VM, o prova completa su WSL) — la prova
-LIVE della Parte 4 non lo richiede.
+Serve **solo a nginx**, cioè solo dalla Parte 7: le prove delle Parti 4 e 5 girano senza.
 
 L'IT consegna il certificato AD CS per `app-ai.camperiosim.com` (richiesta B1). Vanno
 messi due file in `/etc/camperio/tls/`:
@@ -291,10 +293,10 @@ Se stampa `1`, dentro c'è solo il certificato foglia: chiedi all'IT anche l'int
 
 ---
 
-## Parte 4 — Prova LIVE su WSL
+## Parte 4 — Prova LIVE, ancora a stack parziale
 
-Ora che `/etc/camperio/camperio.env` è compilato, l'app deve partire in modalità LIVE
-e leggere da Oracle (WSL raggiunge Oracle in sola lettura via rete aziendale).
+Ora che `/etc/camperio/camperio.env` è compilato, l'app deve partire in modalità LIVE e
+leggere da Oracle. Nginx resta giù: niente è ancora raggiungibile dalla rete.
 
 ### 4.1 Avviare e verificare la modalità
 
@@ -309,105 +311,202 @@ docker compose exec comitato python -c "import data_layer as DL; print(DL.mode()
 **Perché di nuovo l'override "demo"?** Nonostante il nome, quel file non forza la
 modalità DEMO: si limita a pubblicare l'app su `127.0.0.1:5001` e a spegnere l'auth
 per la prova locale. DEMO o LIVE lo decide solo la presenza degli `ORA_*` nel file
-dei segreti — che ora è compilato, quindi l'app parte LIVE ma raggiungibile da
-localhost per il passo 4.2.
+dei segreti — che ora è compilato, quindi l'app parte LIVE ma raggiungibile dal
+loopback della VM per il passo 4.2.
 
 **Contratto da conoscere:** con configurazione LIVE e Oracle irraggiungibile l'app
 **deve rispondere 503** — mai ripiegare in silenzio sui dati DEMO. Se vedi dati DEMO
 con gli `ORA_*` compilati, qualcosa è rotto: fermati e indaga.
 
-### 4.2 Prova del gate su dati reali — OBBLIGATORIA prima della VM
+### 4.2 Prova del gate su dati reali — OBBLIGATORIA prima di esporre
 
-(Rilievo del piano 2.) Con l'app su in LIVE (passo 4.1), apri
-`http://127.0.0.1:5001/` dal browser di Windows, genera la **Matrice Valutaria del
-contratto reale** (endpoint `/api/preview`) e verifica che il gate di validazione
-passi — o capisci *perché* non passa. Questa prova decide se la tolleranza dello
-0,5% è un presidio o un ostacolo.
-
-**Regola assoluta:** output e log di questa prova restano su WSL. **MAI copiare dati
-reali nel repo.**
-
-### 4.3 Verificare le unit systemd (su WSL, prima che tocchino la VM)
+(Rilievo del piano 2.) Serve un browser, e sulla VM non c'è. Si apre un tunnel SSH
+**dal tuo PC** (nuova finestra, la sessione sulla VM resta aperta):
 
 ```bash
-systemd-analyze verify /opt/camperio/deploy/systemd/*
+ssh -N -L 5001:127.0.0.1:5001 <utente>@app-ai.camperiosim.com
 ```
 
-**Cosa fa:** controlla sintassi e riferimenti delle unit. Nessun output = tutto bene.
-Le unit non devono debuttare in produzione: volendo si possono anche installare e
-provare qui (stessi comandi della Parte 5) e rimuovere a prova finita.
+**Cosa fa:** inoltra la porta 5001 del tuo PC alla 5001 del loopback della VM. Non apre
+nulla verso la rete: il traffico passa dentro la connessione SSH, e a tunnel chiuso non
+resta niente. È il sostituto pulito dell'"apri il browser sulla macchina di test".
+
+Poi, nel browser del tuo PC: `http://127.0.0.1:5001/`. Genera la **Matrice Valutaria
+del contratto reale** (endpoint `/api/preview`) e verifica che il gate di validazione
+passi — o capisci *perché* non passa. Questa prova decide se la tolleranza dello 0,5%
+è un presidio o un ostacolo.
+
+**Regola assoluta:** output e log di questa prova restano sulla VM. **MAI copiare dati
+reali nel repo**, e non scaricarli sul PC attraverso il tunnel se non servono.
+
+Chiudi il tunnel (Ctrl+C nella finestra dell'`ssh -N`) appena finito.
+
+### 4.3 Verificare l'auth con la configurazione vera
+
+Il passo 4.1 gira con `COMITATO_AUTH=0` (è l'override demo a spegnerla). Adesso la si
+prova **accesa**, com'è in produzione — sempre senza pubblicare porte:
+
+```bash
+docker compose up -d comitato      # NB: senza -f, e con il servizio nominato: nginx resta giù
+docker compose exec comitato python -c "
+import urllib.error as E, urllib.request as R
+def stato(h):
+    try: return R.urlopen(R.Request('http://127.0.0.1:5001/', headers=h)).status
+    except E.HTTPError as x: return x.code
+print('senza header:', stato({}), '(atteso 401) | con header:',
+      stato({'X-Auth-Request-User': 'bsassoli@camperiosim.com'}), '(atteso 200)')"
+```
+
+**Cosa fa:** senza l'override, `comitato` parte con `COMITATO_AUTH=1` e **non pubblica
+alcuna porta** — per interrogarlo si entra nel container. Si usa urllib perché
+`python:3.13-slim` non ha `curl`.
+
+**Risultato atteso:** `senza header: 401 ... | con header: 200 ...`. Se la prima è 200,
+l'auth applicativa non è attiva: **non proseguire**, l'app si fiderebbe di chiunque
+arrivi a nginx.
+
+### 4.4 Spegnere
+
+```bash
+docker compose down
+```
 
 ---
 
-## Parte 5 — Installazione sulla VM
+## Parte 5 — Unit systemd: installarle senza avviarle
 
-Collegati alla VM (solo da VPN):
+Le unit non hanno un giro di prova da un'altra parte: qui è dove debuttano. Si
+verificano a freddo e si prova il comando che eseguono, prima di consegnarle a systemd.
+
+### 5.1 Verificare le unit a freddo
 
 ```bash
-ssh <utente>@app-ai.camperiosim.com
+cd /opt/camperio
+systemd-analyze verify deploy/systemd/*
 ```
 
-Sulla VM Docker c'è già (verificato dai probe). Ripeti **sulla VM**:
+**Cosa fa:** controlla sintassi, direttive e riferimenti delle unit senza installarle
+né eseguirle.
 
-1. **Parte 1.4–1.5** — deploy key *nuova* (es. `camperio-deploy-vm`: le chiavi non si
-   copiano tra macchine) e clone in `/opt/camperio`.
-2. **Parte 2** — la prova DEMO anche qui, *prima* dei segreti: 5 minuti che confermano
-   l'immagine.
-3. **Parte 3** — segreti e certificato con i valori di produzione.
+**Risultato atteso:** **nessun output**. Ogni riga stampata è un difetto da sistemare
+prima di andare avanti.
 
-### 5.1 Costruire e installare le unit
+### 5.2 Provare il job ETF come comando
 
 ```bash
 cd /opt/camperio/deploy
-docker compose build
-sudo cp systemd/*.service systemd/*.timer /etc/systemd/system/
+docker compose run --rm -T comitato python scarica_etf.py
+```
+
+**Cosa fa:** è esattamente l'`ExecStart` di `camperio-scarica-etf.service`, lanciato a
+mano. Scarica i 9 CSV holdings ETF da iShares nel volume dati. Provandolo qui, se più
+avanti l'unit fallisce sai che il problema è nel wiring systemd e non nel job.
+
+**Risultato atteso:** termina senza errori; i CSV sono nel volume.
+
+### 5.3 Installare le unit — senza avviarle
+
+```bash
+sudo cp /opt/camperio/deploy/systemd/*.service /opt/camperio/deploy/systemd/*.timer /etc/systemd/system/
 sudo systemctl daemon-reload
+sudo systemctl enable camperio.service      # enable, NON --now
+systemctl cat camperio.service              # rilettura: WorkingDirectory ed ExecStart corretti
 ```
 
 **Cosa fanno le unit:**
-- `camperio.service` — porta su l'intero stack Compose (app + oauth2-proxy + nginx)
-  al boot della VM, e lo spegne allo stop.
+- `camperio.service` — porta su l'intero stack Compose (app + oauth2-proxy + nginx) al
+  boot della VM, e lo spegne allo stop.
 - `camperio-scarica-etf.timer` + `.service` — lancia il job di download ETF ogni
   **giovedì alle 11:00** (`Persistent=true`: se la VM era spenta a quell'ora, il run
-  perso parte al riavvio).
+  perso parte al riavvio). Dipende da `docker.service`, non dallo stack: usa
+  `docker compose run`, che si crea il suo container, quindi lanciarlo **non** alza
+  nginx.
 
-### 5.2 Abilitare e avviare
+> **⚠ `enable`, non `enable --now`.** `camperio.service` esegue `docker compose up -d`:
+> avviarlo adesso alzerebbe nginx e aprirebbe la 443 prima della checklist. `enable` lo
+> registra per il boot senza farlo partire ora. Il timer non si abilita affatto, per
+> ora: lo si accende in 7.3, quando lo stack è legittimamente su.
+
+**Risultato atteso:** `enable` conferma la creazione del symlink; `systemctl cat`
+mostra `WorkingDirectory=/opt/camperio/deploy`. `systemctl is-active camperio` deve
+ancora rispondere `inactive`.
+
+---
+
+## Parte 6 — Checklist pre-esposizione (da spuntare PRIMA di alzare nginx)
+
+- [ ] `OAUTH2_PROXY_ALLOWED_GROUPS` valorizzato (senza, entra chiunque nel tenant)
+- [ ] certificato in `/etc/camperio/tls`: `fullchain.pem` con la catena intermedia (Parte 3.3), `privkey.pem` a 600
+- [ ] `COMITATO_AUTH=1` effettivo: senza header → 401 (Parte 4.3)
+- [ ] test di hardening verdi (Parte 2.4)
+- [ ] gate provato su snapshot reale (Parte 4.2)
+- [ ] `/etc/camperio/camperio.env` root:docker 640; niente segreti nei log (`docker compose logs | grep -i secret` vuoto)
+- [ ] `ss -tlnp` non mostra ancora nulla sulla 443
+
+### 6.1 Pre-flight: le due cose ancora sbagliabili, controllate a 443 chiusa
+
+Fra l'apertura della 443 e la prova col primo utente reale c'è una finestra in cui un
+errore di configurazione **è già esposto**. Questi due controlli la riducono alla sola
+verifica che richiede per forza un browser (il 403 fuori gruppo, passo 7.2). Nessuno dei
+due pubblica porte: `compose run` non pubblica nulla se non glielo chiedi.
 
 ```bash
-sudo systemctl enable --now camperio.service
-sudo systemctl enable --now camperio-scarica-etf.timer
-systemctl list-timers 'camperio-*'
+cd /opt/camperio/deploy
+docker compose run --rm --no-deps --entrypoint nginx nginx -t
 ```
 
-**Risultato atteso:** `list-timers` mostra il timer con il prossimo giovedì in `NEXT`.
+**Cosa fa:** valida la configurazione di nginx e verifica che i due file del certificato
+esistano e siano leggibili. È l'errore più probabile al primo avvio, e senza questo
+controllo si manifesterebbe come nginx in crash-loop a 443 già aperta.
 
-> **⚠ `Persistent=true` può far scattare un run subito** al primo `enable`, se systemd
-> ritiene di aver "perso" l'occorrenza precedente. È atteso, non un bug.
-
-### 5.3 Test-fire del job (mai lasciare che il primo run avvenga da solo di giovedì)
+**Risultato atteso:** `syntax is ok` e `test is successful`.
 
 ```bash
-sudo systemctl start camperio-scarica-etf.service
-journalctl -u camperio-scarica-etf -n 50
+sudo grep -c '^OAUTH2_PROXY_ALLOWED_GROUPS=..*' /etc/camperio/camperio.env
 ```
 
-**Risultato atteso:** il log mostra il run completo senza errori.
+**Cosa fa:** verifica che la riga del gruppo Entra esista, sia **scommentata** e abbia
+un valore non vuoto.
 
-### 5.4 Verifiche dello stack
+**Risultato atteso:** `1`. Se stampa `0`, torna al passo 3.2: senza quel valore
+l'app è aperta a tutto il tenant nel momento stesso in cui alzi nginx.
 
-Dalla VM stessa:
+---
+
+## Parte 7 — Accensione
+
+Solo ora, e in quest'ordine.
+
+### 7.1 Alzare lo stack
+
+```bash
+sudo systemctl start camperio.service
+docker compose ps
+ss -tlnp | grep ':443'
+```
+
+**Cosa fa:** l'unit esegue `docker compose up -d`: partono app, oauth2-proxy e nginx.
+Da questo istante la 443 è aperta sulla rete.
+
+**Risultato atteso:** i tre container `running`; `ss` mostra la 443 e **nient'altro**.
 
 ```bash
 curl -k -sI https://127.0.0.1/ | grep -iE "^(HTTP|location)"
 ```
 
-**Risultato atteso:** un redirect (302) con `Location:` verso
-`login.microsoftonline.com`.
+**Risultato atteso:** un redirect (302) con `Location:` verso `login.microsoftonline.com`.
 
-Da un client in VPN, nel browser: `https://app-ai.camperiosim.com/` → login Entra →
-l'app si apre con il tuo utente in alto.
+### 7.2 Verifiche con utenti reali — prima di comunicare l'URL
 
-Altri controlli:
+Da un client in VPN, nel browser:
+
+1. `https://app-ai.camperiosim.com/` con **il tuo utente** (nel gruppo Entra) → login
+   Entra → l'app si apre col tuo utente in alto.
+2. Lo stesso URL con un utente **fuori** dal gruppo → **403**. È la voce di checklist
+   che non si può provare a stack chiuso: va fatta adesso, ed è la ragione per cui fra
+   7.1 e qui non si passa dell'altro tempo (matrice app→gruppo, voce 3 del registro).
+
+Altri controlli, dalla VM:
 
 ```bash
 docker compose logs oauth2-proxy   # nessun errore di issuer o redirect
@@ -416,21 +515,27 @@ docker compose logs oauth2-proxy   # nessun errore di issuer o redirect
 > `/output/` che risponde 403/404 finché nessun job ha ancora scritto file è **atteso**,
 > non un mount rotto.
 
+### 7.3 Accendere il job schedulato
+
+```bash
+sudo systemctl start camperio-scarica-etf.service
+journalctl -u camperio-scarica-etf -n 50
+sudo systemctl enable --now camperio-scarica-etf.timer
+systemctl list-timers 'camperio-*'
+```
+
+**Cosa fa:** prima un test-fire esplicito dell'unit (mai lasciare che il primo run
+avvenga da solo di giovedì), poi l'abilitazione del timer.
+
+**Risultato atteso:** il journal mostra il run completo senza errori; `list-timers`
+mostra il prossimo giovedì in `NEXT`.
+
+> **⚠ `Persistent=true` può far scattare un run subito** al primo `enable --now`, se
+> systemd ritiene di aver "perso" l'occorrenza precedente. È atteso, non un bug.
+
 ---
 
-## Parte 6 — Checklist pre-esposizione (da spuntare PRIMA di comunicare l'URL)
-
-- [ ] `OAUTH2_PROXY_ALLOWED_GROUPS` valorizzato; verificato che un utente fuori gruppo riceve 403
-- [ ] `COMITATO_AUTH=1` effettivo (curl interno senza header → 401)
-- [ ] test di hardening verdi — sull'host di sviluppo/WSL: `.venv/bin/python -m pytest apps/comitato/tests/test_hardening.py` (l'immagine non contiene pytest)
-- [ ] gate provato su snapshot reale (Parte 4.2)
-- [ ] nessuna porta pubblicata oltre 443 (`docker compose ps`, `ss -tlnp`)
-- [ ] `/etc/camperio/camperio.env` root:docker 640; niente segreti nei log (`docker compose logs | grep -i secret` vuoto)
-- [ ] gruppi Entra nel token verificati con un utente reale (matrice app→gruppo, voce 3 del registro)
-
----
-
-## Parte 7 — Rollback
+## Parte 8 — Rollback
 
 Il vecchio mondo (il PC di Edoardo) resta intatto finché la voce corrispondente non è
 migrata **e** verificata (regola del registro): tornare indietro è spegnere, non
@@ -441,15 +546,16 @@ sudo systemctl disable --now camperio-scarica-etf.timer
 sudo systemctl stop camperio
 ```
 
-**Perché anche il timer:** se fermi solo `camperio.service`, il run di giovedì del
-timer rialza lo stack da solo.
+**Perché anche il timer:** il job non rialza lo stack (dipende da `docker.service`, non
+da `camperio.service`), ma di giovedì continuerebbe a scaricare i CSV mentre il vecchio
+mondo è tornato in carico — due sorgenti che scrivono gli stessi dati.
 
 Nessun dato vive solo sulla VM in questa fase: `data/` si ricostruisce dagli input,
 `output/` è rigenerabile.
 
 ---
 
-## Parte 8 — Aggiornamento (nuova versione del codice)
+## Parte 9 — Aggiornamento (nuova versione del codice)
 
 ```bash
 cd /opt/camperio
@@ -463,3 +569,6 @@ curl -k -s https://127.0.0.1/ -o /dev/null -w "%{http_code}\n"   # smoke test: a
 **Perché `--force-recreate`:** ricrea anche i container la cui configurazione non è
 cambiata — serve in particolare a nginx, che altrimenti continuerebbe a puntare al
 vecchio container dell'app.
+
+> Qui `up -d` nudo è corretto: lo stack è già esposto e lo si vuole intero. È l'unico
+> punto del runbook in cui la regola in cima non si applica.

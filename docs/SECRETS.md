@@ -7,7 +7,7 @@ Mai i valori in questo repo, nei log o negli output (spec §7). Sei segreti in t
 | `ORA_PWD` (utenza servizio sola lettura) | `/etc/camperio/camperio.env` (`root:docker`, 640) | DBA Camperio |
 | `ANTHROPIC_API_KEY` | `/etc/camperio/camperio.env` | Bernardino (console Anthropic) |
 | Client secret oauth2-proxy (app registration Entra) | `/etc/camperio/camperio.env` | IT Camperio (Entra ID) |
-| Cookie secret oauth2-proxy | `/etc/camperio/camperio.env` | Bernardino (`openssl rand -base64 32`) |
+| Cookie secret oauth2-proxy | `/etc/camperio/camperio.env` | Bernardino (`openssl rand -base64 32 \| tr '+/' '-_'` — base64 URL-safe, v. DEPLOY 3.2) |
 | Chiave privata TLS | `/etc/camperio/tls/privkey.pem` (600) | IT Camperio (AD CS) |
 | Deploy key SSH read-only (una per macchina) | `~/.ssh/` della macchina | Bernardino (GitHub deploy keys) |
 

@@ -16,7 +16,8 @@ raggiungibile da chiunque.
 >
 > Il corollario pratico: **fino alla Parte 7 non dare mai `docker compose up -d` nudo.**
 > Senza il nome di un servizio alza tutto, nginx incluso, e apre la 443. Nei comandi qui
-> sotto c'è sempre `comitato` esplicito — non è pedanteria.
+> sotto i servizi sono sempre nominati esplicitamente (`comitato`, e dal 6.1 anche
+> `oauth2-proxy`) — non è pedanteria.
 
 **Cosa gira, in due righe** (architettura: ADR 0010 nel repo di pianificazione):
 tre container orchestrati da Docker Compose — l'app `comitato` (Flask), `oauth2-proxy`
@@ -258,13 +259,28 @@ Scommenta e compila, riga per riga:
 | `ANTHROPIC_API_KEY` | la chiave API | Bernardino |
 | `OAUTH2_PROXY_OIDC_ISSUER_URL` | `https://login.microsoftonline.com/<TENANT_ID>/v2.0` | tenant id dall'IT (B2) |
 | `OAUTH2_PROXY_CLIENT_ID` / `CLIENT_SECRET` | dall'app registration Entra | IT (B2) |
-| `OAUTH2_PROXY_COOKIE_SECRET` | generane uno: `openssl rand -base64 32` | tu, adesso |
+| `OAUTH2_PROXY_COOKIE_SECRET` | generane uno: `openssl rand -base64 32 \| tr '+/' '-_'` | tu, adesso |
 | `OAUTH2_PROXY_ALLOWED_GROUPS` | l'objectId del gruppo Entra abilitato | IT (B2) |
 | `OAUTH2_PROXY_REDIRECT_URL` / `WHITELIST_DOMAIN` | già precompilati per `app-ai.camperiosim.com` | — |
 
 > **⚠ `OAUTH2_PROXY_ALLOWED_GROUPS` è obbligatorio.** Senza, *qualunque* account del
 > tenant Camperio entra nell'app dopo il login. È la prima voce della checklist di
 > esposizione (Parte 6) e il primo dei controlli pre-flight (6.1).
+
+> **⚠ Il `tr` sul cookie secret non è un vezzo.** oauth2-proxy decodifica quel valore
+> come base64 **URL-safe** e pretende 16, 24 o 32 byte decodificati. `openssl rand
+> -base64 32` da solo produce base64 *standard*, che può contenere `+` e `/`: la
+> decodifica fallisce, oauth2-proxy prende la stringa alla lettera e muore in
+> crash-loop con
+>
+> ```
+> cookie_secret must be 16, 24, or 32 bytes to create an AES cipher, but is 44 bytes
+> ```
+>
+> Il `tr '+/' '-_'` converte all'alfabeto URL-safe a parità di entropia. Incolla il
+> valore **senza virgolette**. Se cambi questo secret a stack avviato, tutte le
+> sessioni esistenti decadono e gli utenti rifanno il login — qui non ce ne sono
+> ancora, quindi è il momento buono per sbagliarlo.
 
 ### 3.3 Installare il certificato TLS
 
@@ -330,6 +346,25 @@ ssh -N -L 5001:127.0.0.1:5001 <utente>@app-ai.camperiosim.com
 **Cosa fa:** inoltra la porta 5001 del tuo PC alla 5001 del loopback della VM. Non apre
 nulla verso la rete: il traffico passa dentro la connessione SSH, e a tunnel chiuso non
 resta niente. È il sostituto pulito dell'"apri il browser sulla macchina di test".
+
+**Risultato atteso: nessun output e nessun prompt.** La finestra resta appesa, muta —
+`-N` vuol dire "non eseguire nessun comando remoto": quel silenzio *è* il tunnel aperto,
+non un blocco. Se invece torna il prompt, il tunnel è caduto.
+
+> **Prima di lanciarlo, controlla che dall'altra parte ci sia qualcuno.** Il tunnel si
+> apre anche se sulla VM non ascolta nessuno, e il sintomo (browser che non risponde) non
+> dice dove sia il guasto. Sulla VM `docker compose ps` deve mostrare `comitato` con
+> `127.0.0.1:5001->5001/tcp` nella colonna PORTS: la porta la pubblica **solo**
+> l'override `compose.demo.yml` del passo 4.1. Se hai già fatto il 4.3, o un
+> `docker compose down`, il container giusto non c'è più — rilancia il 4.1
+> (aggiungendo `--force-recreate` se un container `comitato` esiste già: Compose non
+> ripubblica le porte su un container esistente).
+>
+> Diagnosi rapida, se il browser non risponde: dalla VM
+> `curl -s -o /dev/null -w "%{http_code}
+" http://127.0.0.1:5001/` — se risponde `000`
+> il problema è sulla VM, non nel tunnel. Se invece risponde `200`, guarda la finestra
+> dell'`ssh -N`: `channel N: open failed` indica il forward, il silenzio va bene.
 
 Poi, nel browser del tuo PC: `http://127.0.0.1:5001/`. Genera la **Matrice Valutaria
 del contratto reale** (endpoint `/api/preview`) e verifica che il gate di validazione
@@ -448,10 +483,13 @@ ancora rispondere `inactive`.
 Fra l'apertura della 443 e la prova col primo utente reale c'è una finestra in cui un
 errore di configurazione **è già esposto**. Questi due controlli la riducono alla sola
 verifica che richiede per forza un browser (il 403 fuori gruppo, passo 7.2). Nessuno dei
-due pubblica porte: `compose run` non pubblica nulla se non glielo chiedi.
+due pubblica porte: `comitato` e `oauth2-proxy` non ne espongono nessuna, e `compose run`
+non pubblica nulla se non glielo chiedi.
 
 ```bash
 cd /opt/camperio/deploy
+docker compose up -d comitato oauth2-proxy
+docker compose ps
 docker compose run --rm --no-deps --entrypoint nginx nginx -t
 ```
 
@@ -459,7 +497,27 @@ docker compose run --rm --no-deps --entrypoint nginx nginx -t
 esistano e siano leggibili. È l'errore più probabile al primo avvio, e senza questo
 controllo si manifesterebbe come nginx in crash-loop a 443 già aperta.
 
-**Risultato atteso:** `syntax is ok` e `test is successful`.
+**Perché prima si alzano gli altri due.** nginx risolve gli hostname degli upstream
+**all'avvio**, non alla prima richiesta: se `oauth2-proxy` non gira, il suo nome non
+esiste nel DNS di Compose e `nginx -t` si ferma lì, prima ancora di guardare il
+certificato. È il senso di questo errore, se lo vedi:
+
+```
+[emerg] host not found in upstream "oauth2-proxy" in /etc/nginx/nginx.conf:25
+```
+
+**Risultato atteso:** `docker compose ps` mostra `comitato` e `oauth2-proxy` con stato
+`running` — e `nginx -t` risponde `syntax is ok` / `test is successful`.
+
+> Se `oauth2-proxy` è in `restarting`, `nginx -t` fallisce allo stesso modo: il container
+> flappa e il nome DNS sparisce fra un tentativo e l'altro. La causa vera è nei log
+> (`docker compose logs oauth2-proxy`) — di norma `OAUTH2_PROXY_OIDC_ISSUER_URL` o le
+> credenziali dell'app registration. È il primo punto del runbook in cui quell'errore
+> può emergere, ed emerge a 443 ancora chiusa: sistemalo qui.
+
+I due container restano su fino alla Parte 7 — `docker compose up -d` del passo 7.1 si
+limiterà ad aggiungere nginx. L'ultima voce della checklist (`ss -tlnp` senza nulla
+sulla 443) resta valida: nessuno dei due pubblica porte.
 
 ```bash
 sudo grep -c '^OAUTH2_PROXY_ALLOWED_GROUPS=..*' /etc/camperio/camperio.env

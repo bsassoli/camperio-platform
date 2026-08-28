@@ -1,10 +1,11 @@
 # Stato migrazione — punto fermo del 28 agosto 2026
 
 Primo deploy sulla VM Elmec (`app-ai.camperiosim.com`) portato fino alla **fine della
-Parte 6** del runbook (`DEPLOY.md`). Ci si è fermati lì per l'unico motivo previsto:
-**manca il certificato TLS** (richiesta B1 all'IT, ancora aperta). Non ci sono problemi
-tecnici in sospeso sulla piattaforma: la configurazione è stata validata fino al punto
-in cui, senza certificato, non si può andare.
+Parte 6** del runbook (`DEPLOY.md`). I blocchi per la Parte 7 sono **due**,
+entrambi in attesa di consegne esterne: il **certificato TLS** (richiesta B1, IT) e le
+**credenziali Oracle** `ORA_USER`/`ORA_PWD` (richiesta A1, DBA — v. sezione dedicata).
+Il resto della configurazione è stato validato fino al punto in cui, senza quelle
+consegne, non si può andare.
 
 ## Dove siamo, voce per voce
 
@@ -12,9 +13,9 @@ in cui, senza certificato, non si può andare.
 |---|---|
 | 1 — Preparazione VM (Docker, deploy key, clone in `/opt/camperio`) | ✅ fatta |
 | 2 — Prova DEMO + test di hardening | ✅ fatta |
-| 3 — Segreti compilati in `/etc/camperio/camperio.env` | ✅ fatta (v. incidente sotto) |
+| 3 — Segreti compilati in `/etc/camperio/camperio.env` | ⚠ quasi: **mancano `ORA_USER` e `ORA_PWD`** (v. sotto) |
 | 3.3 — Certificato TLS in `/etc/camperio/tls/` | ❌ **in attesa dell'IT (B1)** |
-| 4 — Prova LIVE, gate su dati reali, auth applicativa (401/200) | ✅ fatta |
+| 4 — Prova LIVE, gate su dati reali, auth applicativa (401/200) | ⚠ **da rifare**: senza `ORA_USER`/`ORA_PWD` l'app era in DEMO, non LIVE |
 | 5 — Unit systemd installate, `camperio.service` **abilitato ma non avviato** | ✅ fatta |
 | 6 — Checklist pre-esposizione | ✅ tranne la voce certificato |
 | 6.1 — Pre-flight `nginx -t` | ⏳ arriva fino a `cannot load certificate` — che è l'esito atteso senza certificato |
@@ -47,24 +48,35 @@ VM deve essere riavviata in questa finestra, o si preferisce il silenzio:
    443. Rientrato con `systemctl stop camperio`. La Parte 7 si apre **solo** a
    checklist di Parte 6 tutta verde — il certificato è una delle voci.
 
-## Due verifiche rimaste aperte sul file dei segreti
+## Il secondo blocco: le credenziali Oracle mancano
 
-Dopo la ricostruzione (punto 3 sopra) il file contava **10 variabili** scommentate; le
-attese sono 11. Alla ripresa, per prima cosa:
+L'inventario del file (28/8, sera) ha chiuso le verifiche che erano rimaste aperte:
+
+- **`OAUTH2_PROXY_ALLOWED_GROUPS` c'è** ✅ — il lato Entra/oauth2-proxy è completo
+  (c'è anche `OAUTH2_PROXY_PROVIDER`, non prevista dal template ma corretta).
+- **Mancano `ORA_USER` e `ORA_PWD`** ❌ — c'è solo `ORA_DSN`: l'indirizzo del
+  database senza le credenziali. E poiché il file è stato ricostruito dall'ambiente
+  *completo* del container, con ogni probabilità non ci sono mai state: l'app ha
+  sempre girato in DEMO, e la Parte 4 va considerata **non fatta**.
+
+Perché è bloccante quanto il certificato: senza `ORA_*` completi l'app **non dà
+errore** — parte in DEMO su dati sintetici, per contratto. Arrivare alla Parte 7 così
+significherebbe pubblicare l'app con dati finti e nessun sintomo a dirlo. Il 503 sui
+guasti Oracle scatta solo a configurazione LIVE completa.
+
+Rimedio (non serve il certificato, si può fare subito):
 
 ```bash
-sudo sed 's/=.*/=***/' /etc/camperio/camperio.env      # inventario, valori mascherati
-sudo grep -c '^OAUTH2_PROXY_ALLOWED_GROUPS=..*' /etc/camperio/camperio.env   # atteso: 1
-```
+# 1. valori dal DBA / Passwordstate (richiesta A1); poi:
+sudo nano /etc/camperio/camperio.env        # aggiungere ORA_USER=... e ORA_PWD=...
 
-Attese: `ORA_USER`, `ORA_PWD`, `ORA_DSN`, `ANTHROPIC_API_KEY`,
-`OAUTH2_PROXY_OIDC_ISSUER_URL`, `OAUTH2_PROXY_CLIENT_ID`, `OAUTH2_PROXY_CLIENT_SECRET`,
-`OAUTH2_PROXY_COOKIE_SECRET`, `OAUTH2_PROXY_ALLOWED_GROUPS`,
-`OAUTH2_PROXY_REDIRECT_URL`, `OAUTH2_PROXY_WHITELIST_DOMAIN`.
-(`CAMPERIO_DATA` non serve nel file: la imposta il compose.) Se la mancante è
-`REDIRECT_URL` o `WHITELIST_DOMAIN`, i valori sono nel template
-`camperio.example.env`. Se fosse `ALLOWED_GROUPS`, **è bloccante**: senza, dopo il
-login entra chiunque abbia un account nel tenant.
+# 2. prova del collegamento
+cd /opt/camperio/deploy
+docker compose up -d --force-recreate comitato
+docker compose exec comitato python -c "import data_layer as DL; print(DL.mode())"   # atteso: LIVE
+
+# 3. poi la Parte 4 per intero: gate su dati reali via tunnel (4.2) e auth 401/200 (4.3)
+```
 
 ## Ripresa, quando arriva il certificato
 
@@ -81,7 +93,8 @@ grep -c "BEGIN CERTIFICATE" /etc/camperio/tls/fullchain.pem   # atteso: >= 2
 
 Se stampa `1` manca la catena intermedia: tornare dall'IT prima di proseguire.
 
-**2. Chiudere le due verifiche aperte** sul file dei segreti (sezione sopra).
+**2. Credenziali Oracle a bordo e Parte 4 rifatta** (sezione sopra) — si può fare
+anche prima che il certificato arrivi.
 
 **3. Rifare il pre-flight 6.1** — stavolta fino in fondo:
 

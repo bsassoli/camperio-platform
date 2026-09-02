@@ -14,7 +14,7 @@ consegne, non si può andare.
 | 1 — Preparazione VM (Docker, deploy key, clone in `/opt/camperio`) | ✅ fatta |
 | 2 — Prova DEMO + test di hardening | ✅ fatta |
 | 3 — Segreti compilati in `/etc/camperio/camperio.env` | ⚠ quasi: **mancano `ORA_USER` e `ORA_PWD`** (v. sotto) |
-| 3.3 — Certificato TLS in `/etc/camperio/tls/` | ❌ **in attesa dell'IT (B1)** |
+| 3.3 — Certificato TLS in `/etc/camperio/tls/` | ❌ AD CS in attesa dell'IT (B1) — **dal 2 settembre 2026 sbloccato dalla CA interna provvisoria** (runbook 3.3 B, `deploy/tls/genera-ca-interna.sh`) |
 | 4 — Prova LIVE, gate su dati reali, auth applicativa (401/200) | ⚠ **da rifare**: senza `ORA_USER`/`ORA_PWD` l'app era in DEMO, non LIVE |
 | 5 — Unit systemd installate, `camperio.service` **abilitato ma non avviato** | ✅ fatta |
 | 6 — Checklist pre-esposizione | ✅ tranne la voce certificato |
@@ -83,15 +83,18 @@ docker compose exec comitato python -c "import data_layer as DL; print(DL.mode()
 Non si rifà nulla delle Parti 1–5: unit systemd già installate e abilitate, immagine
 già costruita, segreti già compilati. La sequenza è:
 
-**1. Installare il certificato** (runbook 3.3):
+**1. Installare il certificato** (runbook 3.3). Decisione del 2 settembre 2026: non si
+aspetta più B1, si parte con la **CA interna provvisoria**:
 
 ```bash
-# fullchain.pem (certificato + catena intermedia) e privkey.pem in /etc/camperio/tls/
-sudo chmod 600 /etc/camperio/tls/privkey.pem
-grep -c "BEGIN CERTIFICATE" /etc/camperio/tls/fullchain.pem   # atteso: >= 2
+cd /opt/camperio && git pull
+sudo /opt/camperio/deploy/tls/genera-ca-interna.sh
+grep -c "BEGIN CERTIFICATE" /etc/camperio/tls/fullchain.pem   # atteso: 2
 ```
 
-Se stampa `1` manca la catena intermedia: tornare dall'IT prima di proseguire.
+Poi `ca.crt` va installato sui client pilota **prima** del loro primo accesso (3.3 B:
+con HSTS il browser non offre il "procedi comunque"). Quando l'IT consegna il
+certificato AD CS si sovrascrivono i due file e si ricarica nginx (3.3 A).
 
 **2. Credenziali Oracle a bordo e Parte 4 rifatta** (sezione sopra) — si può fare
 anche prima che il certificato arrivi.

@@ -35,10 +35,11 @@ sono nel repo**: li inserisce Bernardino a mano.
 | Utenza Oracle di servizio + service name del DSN | DBA (richiesta A1) | Parte 3 |
 | App registration Entra (client id/secret, tenant) | IT (richiesta B2) | Parte 3 |
 | Chiave API Anthropic | Bernardino | Parte 3 |
-| Certificato AD CS per `app-ai.camperiosim.com` | IT (richiesta B1) | Parte 7 (serve solo a nginx) |
+| Certificato AD CS per `app-ai.camperiosim.com` | IT (richiesta B1) | Parte 7 (serve solo a nginx) — **finché non arriva, si usa la CA interna provvisoria del 3.3** |
 
-Le Parti 2–5 si possono fare **senza il certificato**: se l'IT è in ritardo su B1, non
-sei bloccato — arrivi fino alla checklist e ti fermi lì.
+Le Parti 2–5 si possono fare **senza il certificato**. E il certificato non blocca
+nemmeno la Parte 7: se B1 tarda, il 3.3 spiega come emetterne uno con una CA interna
+fatta da noi, da sostituire quando l'IT consegna quello AD CS.
 
 ---
 
@@ -286,11 +287,18 @@ Scommenta e compila, riga per riga:
 
 Serve **solo a nginx**, cioè solo dalla Parte 7: le prove delle Parti 4 e 5 girano senza.
 
-L'IT consegna il certificato AD CS per `app-ai.camperiosim.com` (richiesta B1). Vanno
-messi due file in `/etc/camperio/tls/`:
+Nginx legge due file in `/etc/camperio/tls/`:
 
-- `fullchain.pem` — il certificato **più la catena intermedia**
-- `privkey.pem` — la chiave privata, poi `sudo chmod 600 /etc/camperio/tls/privkey.pem`
+- `fullchain.pem` — il certificato **più la catena** (intermedia o CA)
+- `privkey.pem` — la chiave privata, permessi `600`
+
+Ci sono due modi per produrli. **A** è il punto di arrivo, **B** è il provvisorio con cui
+si parte oggi. Nginx non distingue: quando arriva A, si sovrascrivono i due file e basta.
+
+#### A — Certificato AD CS dell'IT (destinazione)
+
+L'IT consegna il certificato AD CS per `app-ai.camperiosim.com` (richiesta B1). Copia
+i due file in `/etc/camperio/tls/`, poi `sudo chmod 600 /etc/camperio/tls/privkey.pem`.
 
 Se l'IT consegna un file `.pfx` unico, convertilo:
 
@@ -306,6 +314,47 @@ grep -c "BEGIN CERTIFICATE" fullchain.pem
 ```
 
 Se stampa `1`, dentro c'è solo il certificato foglia: chiedi all'IT anche l'intermedio.
+
+Se nginx è già su con il certificato provvisorio (B), dopo la copia:
+
+```bash
+cd /opt/camperio/deploy && docker compose exec nginx nginx -s reload
+```
+
+#### B — CA interna provvisoria (si parte così)
+
+```bash
+sudo /opt/camperio/deploy/tls/genera-ca-interna.sh
+```
+
+**Cosa fa:** crea una CA interna ("Camperio CA interna", 5 anni) in
+`/etc/camperio/tls/ca/`, emette con quella un certificato per `app-ai.camperiosim.com`
+valido 1 anno e scrive `fullchain.pem` e `privkey.pem` al posto giusto. Lascia anche
+`/etc/camperio/tls/ca.crt`, il certificato della CA. Rilanciarlo è innocuo: riusa la CA
+e riemette solo il certificato server (è così che si rinnova alla scadenza).
+
+**Risultato atteso:** l'ultima riga del controllo dice `fullchain.pem: OK` e
+`grep -c "BEGIN CERTIFICATE" /etc/camperio/tls/fullchain.pem` stampa `2`.
+
+**Il prezzo del provvisorio:** i browser non conoscono questa CA. Finché `ca.crt` non è
+installato sul PC dell'utente, il sito viene rifiutato — e con HSTS acceso (lo è) il
+browser **non offre** il "procedi comunque". Quindi, prima del primo accesso di
+ciascun utente pilota:
+
+```bash
+# dal tuo PC
+scp <utente>@app-ai.camperiosim.com:/etc/camperio/tls/ca.crt .
+```
+
+e poi o lo passi all'IT per la distribuzione via GPO (autorità radice attendibili), o
+lo importi a mano sul client: Windows → doppio clic su `ca.crt` → *Installa
+certificato* → *Computer locale* → *Autorità di certificazione radice attendibili*.
+Edge e Chrome lo usano subito; Firefox va impostato per fidarsi dell'archivio di
+sistema (`security.enterprise_roots.enabled`) o si importa separatamente.
+
+> Non è un problema di sicurezza, è un problema di comodità: la chiave della CA sta
+> solo sulla VM (`/etc/camperio/tls/ca/ca.key`, `600`, root) e firma solo questo
+> nome. Ma ogni client va toccato una volta. Per questo A resta la destinazione.
 
 ---
 
@@ -471,7 +520,7 @@ ancora rispondere `inactive`.
 ## Parte 6 — Checklist pre-esposizione (da spuntare PRIMA di alzare nginx)
 
 - [ ] `OAUTH2_PROXY_ALLOWED_GROUPS` valorizzato (senza, entra chiunque nel tenant)
-- [ ] certificato in `/etc/camperio/tls`: `fullchain.pem` con la catena intermedia (Parte 3.3), `privkey.pem` a 600
+- [ ] certificato in `/etc/camperio/tls`: `fullchain.pem` con la catena (AD CS o CA interna, Parte 3.3), `privkey.pem` a 600; se CA interna, `ca.crt` già installato sui client pilota
 - [ ] `COMITATO_AUTH=1` effettivo: senza header → 401 (Parte 4.3)
 - [ ] test di hardening verdi (Parte 2.4)
 - [ ] gate provato su snapshot reale (Parte 4.2)
@@ -556,7 +605,8 @@ curl -k -sI https://127.0.0.1/ | grep -iE "^(HTTP|location)"
 
 ### 7.2 Verifiche con utenti reali — prima di comunicare l'URL
 
-Da un client in VPN, nel browser:
+Da un client in VPN, nel browser (se sei con la CA interna provvisoria, il client deve
+avere già `ca.crt` installato — 3.3 B — altrimenti il browser rifiuta il sito e basta):
 
 1. `https://app-ai.camperiosim.com/` con **il tuo utente** (nel gruppo Entra) → login
    Entra → l'app si apre col tuo utente in alto.

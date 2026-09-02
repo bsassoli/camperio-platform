@@ -78,6 +78,16 @@ docker compose exec comitato python -c "import data_layer as DL; print(DL.mode()
 # 3. poi la Parte 4 per intero: gate su dati reali via tunnel (4.2) e auth 401/200 (4.3)
 ```
 
+## Bug trovato il 2 settembre 2026: la VM spariva a ogni `systemctl start camperio`
+
+**Sintomo:** dopo l'avvio dello stack la VM non rispondeva più (né ping né ssh) ai PC
+aziendali in `172.18.x.x`; dalla macchina `172.30.231.70`, stessa subnet della VM,
+tutto funzionava. **Causa:** il compose non fissava una subnet e Docker ha assegnato
+alla rete `camperio_default` la `172.18.0.0/16`, aggiungendo sulla VM una rotta che
+dirottava nel bridge Docker ogni risposta verso i client aziendali. **Correzione:**
+subnet fissa `192.168.238.0/24` nel compose (commit nel repo) e pool Docker ristretto
+in `/etc/docker/daemon.json` (runbook 1.2-bis, da applicare a mano sulla VM).
+
 ## Ripresa, quando arriva il certificato
 
 Non si rifà nulla delle Parti 1–5: unit systemd già installate e abilitate, immagine

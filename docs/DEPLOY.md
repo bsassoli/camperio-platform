@@ -81,6 +81,32 @@ docker run --rm hello-world
 
 stampa "Hello from Docker!".
 
+### 1.2-bis Impedire a Docker di rubare gli indirizzi della rete aziendale
+
+```bash
+sudo tee /etc/docker/daemon.json >/dev/null <<'EOF'
+{ "default-address-pools": [ { "base": "192.168.224.0/19", "size": 24 } ] }
+EOF
+sudo systemctl restart docker
+docker network ls --filter driver=bridge -q | xargs -r docker network inspect -f '{{.Name}} {{range .IPAM.Config}}{{.Subnet}}{{end}}'
+```
+
+**Cosa fa:** senza questa impostazione Docker assegna alle reti dei container la prima
+subnet libera del suo pool, che parte da `172.17.0.0/16` e sale. In Camperio i PC
+stanno in `172.18.x.x`: alla prima accensione la rete dello stack ha preso proprio
+`172.18.0.0/16` e la VM ha smesso di rispondere a tutti i client aziendali (le risposte
+finivano nel bridge Docker invece che al gateway). Il file restringe il pool a
+`192.168.224.0`–`192.168.255.255`, a spicchi di /24. Il compose dello stack fissa
+comunque la propria subnet (`192.168.238.0/24`), ma questo protegge anche ogni altra
+rete che Docker dovesse creare sulla VM.
+
+**Risultato atteso:** `docker` riparte senza errori e l'elenco stampato non contiene
+subnet `172.18.x`. Se ne vedi una (per esempio una vecchia `camperio_default`),
+rimuovila: `docker network rm <nome>` — verrà ricreata con la subnet giusta.
+
+> Se l'IT usa in azienda anche la `192.168.224.0/19`, chiedi un intervallo libero e
+> cambia **sia** questo file **sia** la subnet in `deploy/docker-compose.yml`.
+
 ### 1.3 Creare la deploy key per GitHub
 
 Il repo è privato e si clona **con una chiave SSH dedicata in sola lettura** — mai con

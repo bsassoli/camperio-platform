@@ -57,3 +57,14 @@ services:
 
 volumes:
   camperio-data:
+
+# Subnet FISSA per la rete dello stack. Senza, Docker pesca la prima libera dal suo
+# pool (172.17-172.31.x.x) e in Camperio ha preso 172.18.0.0/16, che e' la rete dei
+# PC aziendali: la VM instradava le risposte ai client nel bridge Docker e spariva
+# dalla rete a ogni avvio. Il /24 basta per tre container; se la subnet va cambiata,
+# prima `docker compose down` (la rete va ricreata, non si aggiorna in place).
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 192.168.238.0/24

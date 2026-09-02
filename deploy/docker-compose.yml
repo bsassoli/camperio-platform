@@ -35,6 +35,9 @@ services:
       OAUTH2_PROXY_SET_XAUTHREQUEST: "true"   # espone X-Auth-Request-User/-Groups su /auth
       OAUTH2_PROXY_EMAIL_DOMAINS: "*"          # l'autorizzazione e' per gruppi Entra, non per dominio email
       OAUTH2_PROXY_OIDC_GROUPS_CLAIM: groups
+      # senza whitelist-domain oauth2-proxy rifiuta QUALUNQUE redirect assoluto (rd=),
+      # e nginx lo costruisce sempre assoluto nell'error_page 401 -> loop di warning
+      OAUTH2_PROXY_WHITELIST_DOMAINS: "app-ai.camperiosim.com"
     logging:
       driver: json-file
       options: {max-size: "10m", max-file: "5"}

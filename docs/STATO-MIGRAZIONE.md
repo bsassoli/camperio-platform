@@ -4,8 +4,8 @@ Lo stack è **esposto**: `sudo systemctl start camperio.service` è stato dato, 
 container (`comitato`, `oauth2-proxy`, `nginx`) sono `Up`, la 443 risponde con `302`
 verso `login.microsoftonline.com` e l'app è in modalità **LIVE** (`ORA_USER`/`ORA_PWD`
 sono a bordo). La Parte 7.1 del runbook (`DEPLOY.md`) è fatta. Restano da chiudere la
-7.2 (verifica con utenti reali, dentro e fuori dal gruppo Entra) e la 7.3 (accensione
-del timer ETF).
+7.2 (verifica con utenti reali, assegnati e non assegnati all'app in Entra) e la 7.3
+(accensione del timer ETF).
 
 ## Dove siamo, voce per voce
 
@@ -20,7 +20,7 @@ del timer ETF).
 | 6 — Checklist pre-esposizione | ✅ fatta per intero |
 | 6.1 — Pre-flight `nginx -t` | ✅ passato |
 | 7.1 — Accensione | ✅ fatta: tre container `Up`, `curl -k https://127.0.0.1/` → `302` verso Microsoft |
-| 7.2 — Verifiche con utenti reali (dentro/fuori gruppo Entra) | ❌ **da fare** — richiede un browser e due utenti Entra, non automatizzabile dalla VM |
+| 7.2 — Verifiche con utenti reali (assegnato/non assegnato all'app in Entra) | ❌ **da fare** — richiede un browser e due utenti Entra, non automatizzabile dalla VM |
 | 7.3 — Timer ETF | ❌ **da fare** — `camperio-scarica-etf.timer` ancora `disabled`/`inactive` |
 
 **Stato della VM ora:** stack su, esposto sulla 443, nessun altro fuori. Se la VM
@@ -63,8 +63,8 @@ viene riavviata, `camperio.service` riparte da solo (è `enabled`).
 installato (3.3 B):
 
 ```
-https://app-ai.camperiosim.com/  con un utente NEL gruppo Entra  → login, app col tuo utente
-stesso URL con un utente FUORI dal gruppo                         → atteso 403
+https://app-ai.camperiosim.com/  con un utente ASSEGNATO all'app  → login, app col tuo utente
+stesso URL con un utente NON ASSEGNATO                             → Entra rifiuta in login (AADSTS50105), non 403 dell'app
 ```
 
 Controllo aggiuntivo dalla VM: `docker compose logs oauth2-proxy` senza errori di

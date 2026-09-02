@@ -287,12 +287,15 @@ Scommenta e compila, riga per riga:
 | `OAUTH2_PROXY_OIDC_ISSUER_URL` | `https://login.microsoftonline.com/<TENANT_ID>/v2.0` | tenant id dall'IT (B2) |
 | `OAUTH2_PROXY_CLIENT_ID` / `CLIENT_SECRET` | dall'app registration Entra | IT (B2) |
 | `OAUTH2_PROXY_COOKIE_SECRET` | generane uno: `openssl rand -base64 32 \| tr '+/' '-_'` | tu, adesso |
-| `OAUTH2_PROXY_ALLOWED_GROUPS` | l'objectId del gruppo Entra abilitato | IT (B2) |
 | `OAUTH2_PROXY_REDIRECT_URL` / `WHITELIST_DOMAIN` | già precompilati per `app-ai.camperiosim.com` | — |
 
-> **⚠ `OAUTH2_PROXY_ALLOWED_GROUPS` è obbligatorio.** Senza, *qualunque* account del
-> tenant Camperio entra nell'app dopo il login. È la prima voce della checklist di
-> esposizione (Parte 6) e il primo dei controlli pre-flight (6.1).
+> **⚠ L'autorizzazione è per assegnazione utenti su Entra, non nel file `.env`.**
+> Applicazioni aziendali → app-ai → Proprietà → "Assegnazione obbligatoria" deve
+> essere **Sì**, e solo gli utenti elencati in "Utenti e gruppi" possono ottenere un
+> token. Senza, *qualunque* account del tenant Camperio entra nell'app dopo il login.
+> È la prima voce della checklist di esposizione (Parte 6). Nota: l'assegnazione a
+> **gruppi** richiede Azure AD Premium P1, non disponibile su questo tenant — si
+> assegnano singoli utenti.
 
 > **⚠ Il `tr` sul cookie secret non è un vezzo.** oauth2-proxy decodifica quel valore
 > come base64 **URL-safe** e pretende 16, 24 o 32 byte decodificati. `openssl rand
@@ -545,7 +548,7 @@ ancora rispondere `inactive`.
 
 ## Parte 6 — Checklist pre-esposizione (da spuntare PRIMA di alzare nginx)
 
-- [ ] `OAUTH2_PROXY_ALLOWED_GROUPS` valorizzato (senza, entra chiunque nel tenant)
+- [ ] Su Entra: Applicazioni aziendali → app-ai → Proprietà → "Assegnazione obbligatoria" = Sì, e solo gli utenti attesi risultano in "Utenti e gruppi" (senza, entra chiunque nel tenant)
 - [ ] certificato in `/etc/camperio/tls`: `fullchain.pem` con la catena (AD CS o CA interna, Parte 3.3), `privkey.pem` a 600; se CA interna, `ca.crt` già installato sui client pilota
 - [ ] `COMITATO_AUTH=1` effettivo: senza header → 401 (Parte 4.3)
 - [ ] test di hardening verdi (Parte 2.4)
@@ -594,15 +597,10 @@ I due container restano su fino alla Parte 7 — `docker compose up -d` del pass
 limiterà ad aggiungere nginx. L'ultima voce della checklist (`ss -tlnp` senza nulla
 sulla 443) resta valida: nessuno dei due pubblica porte.
 
-```bash
-sudo grep -c '^OAUTH2_PROXY_ALLOWED_GROUPS=..*' /etc/camperio/camperio.env
-```
-
-**Cosa fa:** verifica che la riga del gruppo Entra esista, sia **scommentata** e abbia
-un valore non vuoto.
-
-**Risultato atteso:** `1`. Se stampa `0`, torna al passo 3.2: senza quel valore
-l'app è aperta a tutto il tenant nel momento stesso in cui alzi nginx.
+L'assegnazione utenti non è un valore nel file dei segreti: va verificata sul portale
+Entra (Applicazioni aziendali → app-ai → Proprietà → "Assegnazione obbligatoria" = Sì,
++ elenco corretto in "Utenti e gruppi"), come da checklist della Parte 6. Nessun
+controllo da riga di comando equivalente è possibile dalla VM.
 
 ---
 
@@ -634,11 +632,13 @@ curl -k -sI https://127.0.0.1/ | grep -iE "^(HTTP|location)"
 Da un client in VPN, nel browser (se sei con la CA interna provvisoria, il client deve
 avere già `ca.crt` installato — 3.3 B — altrimenti il browser rifiuta il sito e basta):
 
-1. `https://app-ai.camperiosim.com/` con **il tuo utente** (nel gruppo Entra) → login
-   Entra → l'app si apre col tuo utente in alto.
-2. Lo stesso URL con un utente **fuori** dal gruppo → **403**. È la voce di checklist
-   che non si può provare a stack chiuso: va fatta adesso, ed è la ragione per cui fra
-   7.1 e qui non si passa dell'altro tempo (matrice app→gruppo, voce 3 del registro).
+1. `https://app-ai.camperiosim.com/` con **il tuo utente** (assegnato all'app in
+   Entra) → login Entra → l'app si apre col tuo utente in alto.
+2. Lo stesso URL con un utente **non assegnato** all'app → Entra rifiuta già in fase
+   di login, prima di tornare all'app (schermata di errore Microsoft, tipicamente
+   `AADSTS50105`), non un 403 di `oauth2-proxy`. È la voce di checklist che non si può
+   provare a stack chiuso: va fatta adesso, ed è la ragione per cui fra 7.1 e qui non
+   si passa dell'altro tempo (matrice app→utenti assegnati, voce 3 del registro).
 
 Altri controlli, dalla VM:
 

@@ -2,10 +2,11 @@
 
 Lo stack è **esposto**: `sudo systemctl start camperio.service` è stato dato, i tre
 container (`comitato`, `oauth2-proxy`, `nginx`) sono `Up`, la 443 risponde con `302`
-verso `login.microsoftonline.com` e l'app è in modalità **LIVE** (`ORA_USER`/`ORA_PWD`
-sono a bordo). La Parte 7.1 del runbook (`DEPLOY.md`) è fatta. Restano da chiudere la
-7.2 (verifica con utenti reali, assegnati e non assegnati all'app in Entra) e la 7.3
-(accensione del timer ETF).
+verso `login.microsoftonline.com` e l'app è in modalità **LIVE**, connessa a
+**ANTANA (produzione)** — `ORA_DSN=selmora01.ad.camperiosim.com:1521/antana.ad.camperiosim.com`.
+La Parte 7.1 del runbook (`DEPLOY.md`) è fatta e la 7.2 (utenti assegnati/non
+assegnati in Entra) è stata verificata. Resta da chiudere solo la 7.3 (accensione
+del timer ETF).
 
 ## Dove siamo, voce per voce
 
@@ -15,12 +16,12 @@ sono a bordo). La Parte 7.1 del runbook (`DEPLOY.md`) è fatta. Restano da chiud
 | 2 — Prova DEMO + test di hardening | ✅ fatta |
 | 3 — Segreti compilati in `/etc/camperio/camperio.env` | ✅ fatta (`ORA_USER`/`ORA_PWD` a bordo) |
 | 3.3 — Certificato TLS in `/etc/camperio/tls/` | ✅ CA interna provvisoria attiva (runbook 3.3 B, `deploy/tls/genera-ca-interna.sh`) — resta da sostituire col certificato AD CS quando l'IT lo consegna (B1, 3.3 A) |
-| 4 — Prova LIVE, gate su dati reali, auth applicativa (401/200) | ✅ fatta — `data_layer.mode()` conferma `LIVE`, connesso su **ANTATEST** (test), non ancora ANTANA (produzione) |
+| 4 — Prova LIVE, gate su dati reali, auth applicativa (401/200) | ✅ fatta — `data_layer.mode()` conferma `LIVE`, connesso su **ANTANA (produzione)** dal 4/9 (prima su ANTATEST per il collaudo) |
 | 5 — Unit systemd installate, `camperio.service` abilitato | ✅ fatta, e ora **avviato** |
 | 6 — Checklist pre-esposizione | ✅ fatta per intero |
 | 6.1 — Pre-flight `nginx -t` | ✅ passato |
 | 7.1 — Accensione | ✅ fatta: tre container `Up`, `curl -k https://127.0.0.1/` → `302` verso Microsoft |
-| 7.2 — Verifiche con utenti reali (assegnato/non assegnato all'app in Entra) | ❌ **da fare** — richiede un browser e due utenti Entra, non automatizzabile dalla VM |
+| 7.2 — Verifiche con utenti reali (assegnato/non assegnato all'app in Entra) | ✅ fatta |
 | 7.3 — Timer ETF | ❌ **da fare** — `camperio-scarica-etf.timer` ancora `disabled`/`inactive` |
 
 **Stato della VM ora:** stack su, esposto sulla 443, nessun altro fuori. Se la VM
@@ -76,21 +77,15 @@ viene riavviata, `camperio.service` riparte da solo (è `enabled`).
    a questo file). **Corretto** il DSN in
    `selmora02.ad.camperiosim.com:1521/ANTATEST`; connessione verificata OK.
    Rete verso `selmora02` già aperta, nessuna richiesta aggiuntiva all'IT.
+9. **Passaggio da ANTATEST ad ANTANA (produzione)** (4/9): verificato prima che
+   `ORA_USER`/`ORA_PWD` avessero accesso anche su ANTANA (stesso listener
+   `selmora01`, service name `antana.ad.camperiosim.com` — stringa lunga, non
+   un nome breve come `ANTATEST`), poi cambiato il DSN. Connessione OK,
+   confermata dopo la 7.2. **L'app ora legge dati reali di produzione.**
 
 ## Rimasto da fare
 
-**1. Parte 7.2 — verifica con utenti reali**, da un client con `ca.crt` già
-installato (3.3 B):
-
-```
-https://app-ai.camperiosim.com/  con un utente ASSEGNATO all'app  → login, app col tuo utente
-stesso URL con un utente NON ASSEGNATO                             → Entra rifiuta in login (AADSTS50105), non 403 dell'app
-```
-
-Controllo aggiuntivo dalla VM: `docker compose logs oauth2-proxy` senza errori di
-issuer o redirect (a parte gli eventuali test da `127.0.0.1`, che sono attesi).
-
-**2. Parte 7.3 — accendere il timer ETF:**
+**Parte 7.3 — accendere il timer ETF:**
 
 ```bash
 sudo systemctl start camperio-scarica-etf.service
@@ -101,15 +96,6 @@ systemctl list-timers 'camperio-*'
 
 **Se qualcosa va storto:** `sudo systemctl stop camperio` spegne tutto senza danno —
 è il rollback della Parte 8.
-
-**3. Passaggio da ANTATEST a ANTANA (produzione)**, quando si decide di andare live
-con dati reali — non automatico, va deciso esplicitamente:
-
-```bash
-sudo sed -i 's|^ORA_DSN=.*|ORA_DSN=selmora01.ad.camperiosim.com:1521/antana.ad.camperiosim.com|' /etc/camperio/camperio.env
-cd /opt/camperio/deploy
-docker compose up -d --force-recreate comitato
-```
 
 > Il service name di ANTANA è la stringa `antana.ad.camperiosim.com` (non un nome
 > breve come `ANTATEST`), sull'host `selmora01`. Prima del cambio, verificare che

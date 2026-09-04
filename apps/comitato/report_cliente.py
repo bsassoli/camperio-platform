@@ -18,8 +18,8 @@ VERDE = "#1F7A4D"; ROSSO = "#B3261E"; RIGA = "#D9D6CE"; ALT = "#F4F2EC"; ORO = "
 _FUNDS = {"95ZYC2", "8W8C01", "54OPLF", "8W8C34", "8W8C45", "50QNF8", "52PZG8"}
 _DEV = {"EUR", "USD", "GBP", "CHF", "JPY", "NOK", "DKK", "SEK", "CAD"}
 
-_F1 = ("Camperio SIM S.p.A. — Via Camperio, 9 — 20123 Milano — Tel +39-02 30322100 — Fax +39-02 30322122 — "
-       "camperioSIM@camperio.net — www.camperiosim.com")
+_F1 = ("Camperio SIM S.p.A. — Via Camperio, 9 — 20123 Milano — Tel +39 02.50020918 — Fax +39 02.50020917 — "
+       "camperioSIM@camperiosim.com — www.camperiosim.com")
 _F2 = ("Consob delibera d'iscrizione n. 11761 del 22/12/1998 — albo n. 48 — Gestione di portafogli, Consulenza in materia di "
        "investimenti, Ricezione e trasmissione di ordini — Cap. Soc. € 3.079.083 — C.F. 02342760275 — P.IVA 11791000158 — "
        "REA MI-1409117 — Codice Banca d'Italia 16206/5 — Fondo Nazionale di Garanzia SIM0077.")

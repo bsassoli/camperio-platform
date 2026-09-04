@@ -15,7 +15,7 @@ sono a bordo). La Parte 7.1 del runbook (`DEPLOY.md`) è fatta. Restano da chiud
 | 2 — Prova DEMO + test di hardening | ✅ fatta |
 | 3 — Segreti compilati in `/etc/camperio/camperio.env` | ✅ fatta (`ORA_USER`/`ORA_PWD` a bordo) |
 | 3.3 — Certificato TLS in `/etc/camperio/tls/` | ✅ CA interna provvisoria attiva (runbook 3.3 B, `deploy/tls/genera-ca-interna.sh`) — resta da sostituire col certificato AD CS quando l'IT lo consegna (B1, 3.3 A) |
-| 4 — Prova LIVE, gate su dati reali, auth applicativa (401/200) | ✅ fatta — `data_layer.mode()` conferma `LIVE` |
+| 4 — Prova LIVE, gate su dati reali, auth applicativa (401/200) | ✅ fatta — `data_layer.mode()` conferma `LIVE`, connesso su **ANTATEST** (test), non ancora ANTANA (produzione) |
 | 5 — Unit systemd installate, `camperio.service` abilitato | ✅ fatta, e ora **avviato** |
 | 6 — Checklist pre-esposizione | ✅ fatta per intero |
 | 6.1 — Pre-flight `nginx -t` | ✅ passato |
@@ -56,6 +56,26 @@ viene riavviata, `camperio.service` riparte da solo (è `enabled`).
    ad accedere 4 volte prima ancora che l'URL fosse comunicato (7.2 non ancora
    fatta). **Corretto** aggiungendo `app-ai.camperiosim.com` alla whitelist —
    commit `060a749`, verificato con `--force-recreate` di `oauth2-proxy`.
+7. **Login Entra impossibile, `AADSTS700016`** (2/9, pomeriggio): nessuna app
+   registration esisteva davvero su Entra ID — `OAUTH2_PROXY_CLIENT_ID` era un
+   placeholder mai sostituito. Nello stesso file, `OAUTH2_PROXY_ALLOWED_GROUPS`
+   non conteneva un objectId di gruppo ma quasi lo stesso valore di
+   `OAUTH2_PROXY_CLIENT_SECRET` (mancava solo il primo carattere): un segreto
+   finito per errore in due variabili durante una ricostruzione precedente del
+   file. **Risolto** creando l'app registration "app-ai" da zero (redirect URI,
+   claim/assegnazione, nuovo client secret) — v. commit `46b8718` per il
+   passaggio da autorizzazione a gruppo ad autorizzazione per utenti assegnati,
+   che nel frattempo ha reso `ALLOWED_GROUPS` non più pertinente.
+8. **Oracle irraggiungibile in LIVE, `DPY-6001` (`ORA-12514`)** (4/9): la rete
+   verso `selmora01.ad.camperiosim.com:1521` funzionava, ma quel listener non ha
+   mai avuto il servizio `ANTATEST` registrato — lo serve `selmora02`, non
+   `selmora01` (che serve `ANTANA`, l'ambiente di produzione). Il messaggio
+   d'errore mostrato in pagina (`apps/comitato/app.py:163`) riporta solo il
+   testo generico di `OracleIndisponibileError`, non la causa reale: per
+   vederla bisogna connettersi a mano da dentro il container (comando in fondo
+   a questo file). **Corretto** il DSN in
+   `selmora02.ad.camperiosim.com:1521/ANTATEST`; connessione verificata OK.
+   Rete verso `selmora02` già aperta, nessuna richiesta aggiuntiva all'IT.
 
 ## Rimasto da fare
 
@@ -81,3 +101,36 @@ systemctl list-timers 'camperio-*'
 
 **Se qualcosa va storto:** `sudo systemctl stop camperio` spegne tutto senza danno —
 è il rollback della Parte 8.
+
+**3. Passaggio da ANTATEST a ANTANA (produzione)**, quando si decide di andare live
+con dati reali — non automatico, va deciso esplicitamente:
+
+```bash
+sudo sed -i 's|^ORA_DSN=.*|ORA_DSN=selmora01.ad.camperiosim.com:1521/antana.ad.camperiosim.com|' /etc/camperio/camperio.env
+cd /opt/camperio/deploy
+docker compose up -d --force-recreate comitato
+```
+
+> Il service name di ANTANA è la stringa `antana.ad.camperiosim.com` (non un nome
+> breve come `ANTATEST`), sull'host `selmora01`. Prima del cambio, verificare che
+> `ORA_USER`/`ORA_PWD` abbiano i permessi anche su quell'istanza — potrebbero essere
+> stati concessi solo su ANTATEST.
+
+## Comando per leggere l'errore Oracle reale (non quello mostrato in pagina)
+
+`apps/comitato/app.py:163` mostra solo il messaggio generico di
+`OracleIndisponibileError`, non la causa. Per vederla:
+
+```bash
+docker compose exec -T comitato python -c "
+from camperio_core import config as _config
+import oracledb
+cfg = _config.from_env()
+print('DSN:', cfg.ora_dsn)
+try:
+    oracledb.connect(user=cfg.ora_user, password=cfg.ora_pwd, dsn=cfg.ora_dsn).close()
+    print('CONNESSIONE OK')
+except Exception as e:
+    print('ERRORE:', type(e).__name__, '-', e)
+"
+```

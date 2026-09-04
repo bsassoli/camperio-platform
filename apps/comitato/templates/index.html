@@ -12,7 +12,10 @@
     </div>
     <div style="text-align:right">
       <div class="mode {{ 'live' if mode=='LIVE' else 'demo' }}">{{ 'LIVE - Oracle' if mode=='LIVE' else 'DEMO - dati in cache' }}</div>
-      {% if utente %}<div style="font-size:11px;color:#fff;opacity:.85;margin-top:6px">Utente: <b>{{ utente }}</b> &nbsp;|&nbsp; <a href="/oauth2/sign_out" style="color:#fff">Esci</a></div>{% endif %}
+      {% if utente %}<div style="font-size:11px;color:#fff;opacity:.85;margin-top:6px">Utente: <b>{{ utente }}</b>
+        &nbsp;|&nbsp; <a href="/oauth2/sign_out" style="color:#fff">Esci</a>
+        {% if logout_completo_url %}&nbsp;|&nbsp; <a href="/oauth2/sign_out?rd={{ logout_completo_url }}" style="color:#fff">Esci da tutto</a>{% endif %}
+      </div>{% endif %}
     </div>
   </div>
 </header>

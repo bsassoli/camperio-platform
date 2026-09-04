@@ -16,6 +16,9 @@ services:
     environment:
       COMITATO_AUTH: "1"     # dietro nginx l'utente arriva sempre dagli header
       CAMPERIO_DATA: /var/lib/camperio
+      # non e' un segreto: e' lo stesso tenant gia' visibile in ogni redirect verso
+      # login.microsoftonline.com. Serve al pulsante "Esci da tutto" (logout Entra).
+      ENTRA_TENANT_ID: "a119a453-2306-46ca-9ce1-3ea643edba4f"
     volumes:
       - camperio-data:/var/lib/camperio
     # nessuna porta pubblicata: raggiungibile solo dalla rete compose (nginx)
@@ -35,8 +38,10 @@ services:
       OAUTH2_PROXY_SET_XAUTHREQUEST: "true"   # espone X-Auth-Request-User/-Groups su /auth
       OAUTH2_PROXY_EMAIL_DOMAINS: "*"          # l'autorizzazione e' per assegnazione utenti su Entra, non per dominio email
       # senza whitelist-domain oauth2-proxy rifiuta QUALUNQUE redirect assoluto (rd=),
-      # e nginx lo costruisce sempre assoluto nell'error_page 401 -> loop di warning
-      OAUTH2_PROXY_WHITELIST_DOMAINS: "app-ai.camperiosim.com"
+      # e nginx lo costruisce sempre assoluto nell'error_page 401 -> loop di warning.
+      # login.microsoftonline.com serve al pulsante "Esci da tutto" (rd= verso il
+      # logout Entra), stessa validazione del redirect applicativo.
+      OAUTH2_PROXY_WHITELIST_DOMAINS: "app-ai.camperiosim.com,login.microsoftonline.com"
     logging:
       driver: json-file
       options: {max-size: "10m", max-file: "5"}

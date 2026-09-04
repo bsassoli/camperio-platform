@@ -2,7 +2,7 @@
 """Comitato Investimenti - app interattiva analisi portafogli Camperio SIM.
 Report: Matrice Valutaria, Titoli lordo/netto vs benchmark, Pesi e scostamenti.
 Date DAL/AL libere (calendario): AL deve esistere (altrimenti niente report), DAL flessibile con avviso."""
-import os, tempfile, datetime, html
+import os, tempfile, datetime, html, urllib.parse
 from flask import Flask, render_template, request, jsonify, send_file, Response
 import data_layer as DL
 import lookthrough as L
@@ -41,6 +41,19 @@ def current_user():
         return None
     return u.split("\\")[-1].split("@")[0]
 
+_ENTRA_TENANT_ID = os.getenv("ENTRA_TENANT_ID", "")
+
+def logout_completo_url():
+    """rd= per /oauth2/sign_out: dopo il logout locale, chiude anche la sessione SSO
+    Entra nel browser (disconnette pure altre app aziendali che la condividono).
+    Stringa vuota se ENTRA_TENANT_ID non e' configurato: il pulsante va nascosto."""
+    if not _ENTRA_TENANT_ID:
+        return ""
+    post_logout = urllib.parse.quote(request.url_root, safe="")
+    ms_logout = (f"https://login.microsoftonline.com/{_ENTRA_TENANT_ID}/oauth2/v2.0/logout"
+                 f"?post_logout_redirect_uri={post_logout}")
+    return urllib.parse.quote(ms_logout, safe="")
+
 @app.before_request
 def _gate():
     # Se COMITATO_AUTH=1, richiede l'utente dal proxy (blocca accesso diretto bypassando IIS).
@@ -62,7 +75,8 @@ def _nocache(resp):
 @app.route("/")
 def index():
     return render_template("index.html", mode=DL.mode(), contratti=DL.list_contratti(),
-                           schemi=DL.SCHEMI, tipi=TIPI, tipi_cli=TIPI_CLI, build=BUILD, utente=current_user() or "")
+                           schemi=DL.SCHEMI, tipi=TIPI, tipi_cli=TIPI_CLI, build=BUILD, utente=current_user() or "",
+                           logout_completo_url=logout_completo_url())
 
 @app.route("/api/dates")
 def api_dates():

@@ -82,6 +82,25 @@ viene riavviata, `camperio.service` riparte da solo (è `enabled`).
    `selmora01`, service name `antana.ad.camperiosim.com` — stringa lunga, non
    un nome breve come `ANTATEST`), poi cambiato il DSN. Connessione OK,
    confermata dopo la 7.2. **L'app ora legge dati reali di produzione.**
+10. **`X-Auth-Request-User` mostrava il `sub` OIDC** (id opaco pairwise, tipo
+    `7p7Z2Eq3...`), non il nome utente (4/9): è così di default in
+    oauth2-proxy, il flag `--prefer-email-to-user` **non** si applica a questo
+    header (solo a `--pass-user-headers`/`--pass-basic-auth`). **Corretto** in
+    nginx: `$auth_user` ora prende `$upstream_http_x_auth_request_email`
+    invece di `..._user`. Aggiunti anche due pulsanti in pagina: "Esci"
+    (chiude solo la sessione app) e "Esci da tutto" (redirect al logout Entra,
+    chiude anche la sessione SSO nel browser — disconnette pure altre app
+    aziendali che la condividono, è voluto).
+11. **`nginx` con DNS stantio su `oauth2-proxy` dopo un force-recreate** (4/9,
+    scoperto verificando il punto 10): `proxy_pass http://oauth2-proxy:4180`
+    è statico, nginx risolve l'hostname una sola volta all'avvio — esattamente
+    il problema già noto e corretto per `comitato` (v. commento in
+    `nginx.conf`), ma mai applicato a `oauth2-proxy`. Ricreare `oauth2-proxy`
+    senza ricreare anche `nginx` lascia nginx puntato al vecchio IP:
+    `connect() failed (111: Connection refused)` nei log, 500 al posto del
+    302 di login. **Corretto** con lo stesso pattern resolver+variabile.
+    **Promemoria operativo:** ricreare sempre `nginx` insieme a `oauth2-proxy`
+    (o a `comitato`), non uno dei due soltanto.
 
 ## Rimasto da fare
 

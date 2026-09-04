@@ -1,12 +1,16 @@
-# Stato migrazione — aggiornato al 2 settembre 2026 (pomeriggio)
+# Stato migrazione — completata il 4 settembre 2026
 
-Lo stack è **esposto**: `sudo systemctl start camperio.service` è stato dato, i tre
-container (`comitato`, `oauth2-proxy`, `nginx`) sono `Up`, la 443 risponde con `302`
-verso `login.microsoftonline.com` e l'app è in modalità **LIVE**, connessa a
-**ANTANA (produzione)** — `ORA_DSN=selmora01.ad.camperiosim.com:1521/antana.ad.camperiosim.com`.
-La Parte 7.1 del runbook (`DEPLOY.md`) è fatta e la 7.2 (utenti assegnati/non
-assegnati in Entra) è stata verificata. Resta da chiudere solo la 7.3 (accensione
-del timer ETF).
+Il runbook (`DEPLOY.md`, Parti 1–7) è **chiuso per intero**. Lo stack è esposto
+(`camperio`, `oauth2-proxy`, `nginx` `Up`), l'app è in modalità **LIVE** su
+**ANTANA (produzione)** — `ORA_DSN=selmora01.ad.camperiosim.com:1521/antana.ad.camperiosim.com`
+— login Entra verificato con utenti assegnati e non assegnati (7.2), e il timer
+`camperio-scarica-etf.timer` è attivo (7.3, abilitato il 4/9, primo run atteso
+giovedì 2026-09-10 11:00 UTC — il test-fire manuale dello stesso giorno ha già dato
+9/9 ETF scaricati).
+
+Resta aperto solo un punto non bloccante: il certificato TLS gira ancora sulla **CA
+interna provvisoria** (3.3 B), in attesa del certificato AD CS dall'IT (richiesta B1,
+3.3 A) — sostituzione a runbook invariato quando arriva, nessun altro impatto.
 
 ## Dove siamo, voce per voce
 
@@ -22,7 +26,7 @@ del timer ETF).
 | 6.1 — Pre-flight `nginx -t` | ✅ passato |
 | 7.1 — Accensione | ✅ fatta: tre container `Up`, `curl -k https://127.0.0.1/` → `302` verso Microsoft |
 | 7.2 — Verifiche con utenti reali (assegnato/non assegnato all'app in Entra) | ✅ fatta |
-| 7.3 — Timer ETF | ❌ **da fare** — `camperio-scarica-etf.timer` ancora `disabled`/`inactive` |
+| 7.3 — Timer ETF | ✅ fatta — test-fire manuale 9/9 OK, timer abilitato, `NEXT`: giovedì 2026-09-10 11:00 UTC |
 
 **Stato della VM ora:** stack su, esposto sulla 443, nessun altro fuori. Se la VM
 viene riavviata, `camperio.service` riparte da solo (è `enabled`).
@@ -101,25 +105,23 @@ viene riavviata, `camperio.service` riparte da solo (è `enabled`).
     302 di login. **Corretto** con lo stesso pattern resolver+variabile.
     **Promemoria operativo:** ricreare sempre `nginx` insieme a `oauth2-proxy`
     (o a `comitato`), non uno dei due soltanto.
+12. **Contatti sbagliati in calce alla pagina** (4/9): telefono e dominio email
+    non aggiornati (`+39-02 30322100` e `camperioSIM@camperio.net`, un dominio
+    non aziendale). **Corretto** in `+39 02.50020918` e
+    `CamperioSim@camperiosim.com`.
+13. **Timer ETF mai testato prima dell'abilitazione** (4/9): nessun log, nessun
+    run precedente. Lanciato a mano `docker compose run --rm -T comitato python
+    scarica_etf.py` come test-fire: **9/9 ETF scaricati OK**. Timer poi
+    abilitato — prossimo run giovedì 2026-09-10 11:00 UTC.
 
 ## Rimasto da fare
 
-**Parte 7.3 — accendere il timer ETF:**
+Un solo punto, non bloccante: **sostituire la CA interna provvisoria col certificato
+AD CS** (3.3 A) quando l'IT lo consegna (richiesta B1) — procedura in `DEPLOY.md`
+3.3, nessun altro impatto sul resto dello stack.
 
-```bash
-sudo systemctl start camperio-scarica-etf.service
-journalctl -u camperio-scarica-etf -n 50
-sudo systemctl enable --now camperio-scarica-etf.timer
-systemctl list-timers 'camperio-*'
-```
-
-**Se qualcosa va storto:** `sudo systemctl stop camperio` spegne tutto senza danno —
-è il rollback della Parte 8.
-
-> Il service name di ANTANA è la stringa `antana.ad.camperiosim.com` (non un nome
-> breve come `ANTATEST`), sull'host `selmora01`. Prima del cambio, verificare che
-> `ORA_USER`/`ORA_PWD` abbiano i permessi anche su quell'istanza — potrebbero essere
-> stati concessi solo su ANTATEST.
+**Rollback, se mai servisse:** `sudo systemctl stop camperio` spegne tutto senza
+danno (Parte 8). Per il solo timer ETF: `sudo systemctl disable --now camperio-scarica-etf.timer`.
 
 ## Comando per leggere l'errore Oracle reale (non quello mostrato in pagina)
 

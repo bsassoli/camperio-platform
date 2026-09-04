@@ -559,11 +559,7 @@ def titoli_excel(t, path):
 _LOGO = os.path.join(HERE, "static", "logo-camperio.png")
 _LOGO_W = os.path.join(HERE, "static", "logo-bianco.png")
 _F1 = "Via Camperio, 9 — 20123 Milano · Tel +39 02.50020918 · camperioSIM@camperiosim.com · www.camperiosim.com"
-_F2 = ("Consob — delibera d'iscrizione n. 11761 del 22/12/1998 — albo n. 48 — Servizi di investimento autorizzati ai sensi "
-       "del D.Lgs. 58/98: Gestione di portafogli (delibera n. 11761 del 22/12/1998) — Consulenza in materia di investimenti "
-       "(D.Lgs. 164 del 17/09/2007) — Ricezione e trasmissione di ordini (delibera n. 17425 del 20/07/2010) — "
-       "Cap. Soc. € 3.079.083 — C.F. 02342760275 — P.IVA 11791000158 — REA MI-1409117 — Codice Banca d'Italia 16206/5 — "
-       "Fondo Nazionale di Garanzia SIM0077.")
+_F2 = "Consob — delibera n. 11761 del 22/12/1998 — albo n. 48. C.F. 02342760275 — P.IVA 11791000158 — Cod. Banca d'Italia 16206/5 — FNG SIM0077."
 
 def _doc(titolo, sub):
     from docx import Document

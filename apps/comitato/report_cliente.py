@@ -5,7 +5,7 @@ come e' investito (ciambella + tabella + barre settori), parte obbligazionaria (
 esposizione valutaria look-through. Pag.2: allegato posizioni complete per categoria.
 Azioni = esposizione azionaria look-through (dirette + fondi + indici). Dati live da Oracle.
 Marchio Camperio + footer di legge + disclaimer MiFID."""
-import os, re, datetime, tempfile, textwrap
+import os, re, datetime, tempfile
 import data_layer as DL
 import lookthrough as L
 
@@ -20,14 +20,9 @@ _DEV = {"EUR", "USD", "GBP", "CHF", "JPY", "NOK", "DKK", "SEK", "CAD"}
 
 _F1 = ("Camperio SIM S.p.A. — Via Camperio, 9 — 20123 Milano — Tel +39 02.50020918 — Fax +39 02.50020917 — "
        "camperioSIM@camperiosim.com — www.camperiosim.com")
-# testo verbatim dalla carta intestata ufficiale: le delibere/norme sono per ogni
-# singolo servizio autorizzato, non un elenco generico (disclosure regolamentare)
-_F2 = ("Consob — delibera d'iscrizione n. 11761 del 22/12/1998 — albo n. 48 — Servizi di investimento autorizzati ai sensi "
-       "del D.Lgs. 58/98: Gestione di portafogli (delibera n. 11761 del 22/12/1998) — Consulenza in materia di investimenti "
-       "(D.Lgs. 164 del 17/09/2007) — Ricezione e trasmissione di ordini (delibera n. 17425 del 20/07/2010) — "
-       "Cap. Soc. € 3.079.083 — C.F. 02342760275 — P.IVA 11791000158 — REA MI-1409117 — Codice Banca d'Italia 16206/5 — "
-       "Fondo Nazionale di Garanzia SIM0077.")
-_F2_RIGHE = textwrap.wrap(_F2, width=200, break_long_words=False, break_on_hyphens=False)
+_F2 = ("Consob delibera d'iscrizione n. 11761 del 22/12/1998 — albo n. 48 — Gestione di portafogli, Consulenza in materia di "
+       "investimenti, Ricezione e trasmissione di ordini — Cap. Soc. € 3.079.083 — C.F. 02342760275 — P.IVA 11791000158 — "
+       "REA MI-1409117 — Codice Banca d'Italia 16206/5 — Fondo Nazionale di Garanzia SIM0077.")
 _DISC = ("Documento informativo personale, non costituisce raccomandazione personalizzata ai sensi del Reg. Consob 20307/2018. "
          "I rendimenti passati non sono indicativi di quelli futuri.")
 
@@ -246,13 +241,11 @@ def cliente_pdf(d, path):
         canvas.drawRightString(w - 18 * mm, h - 20 * mm, "Documento riservato e personale")
         canvas.setStrokeColor(riga); canvas.setLineWidth(0.7); canvas.line(18 * mm, h - 23 * mm, w - 18 * mm, h - 23 * mm)
         canvas.setFillColor(gri); canvas.setFont("Helvetica", 6.2)
-        canvas.drawCentredString(w / 2, 13.5 * mm, _F1)
-        for i, testo_f2 in enumerate(_F2_RIGHE):
-            canvas.drawCentredString(w / 2, (11.5 - 1.8 * i) * mm, testo_f2)
-        canvas.setFont("Helvetica-Oblique", 5.9)
-        canvas.drawCentredString(w / 2, (11.5 - 1.8 * len(_F2_RIGHE)) * mm, _DISC)
+        canvas.drawCentredString(w / 2, 12.5 * mm, _F1)
+        canvas.drawCentredString(w / 2, 10 * mm, _F2[:118]); canvas.drawCentredString(w / 2, 8 * mm, _F2[118:])
+        canvas.setFont("Helvetica-Oblique", 5.9); canvas.drawCentredString(w / 2, 5.8 * mm, _DISC)
         # riga propria: il disclaimer centrato è largo abbastanza da coprire il
-        # numero di pagina se condividono la stessa riga
+        # numero di pagina se condividono la stessa riga (erano entrambi a 5.8mm)
         canvas.setFont("Helvetica", 7); canvas.drawRightString(w - 18 * mm, 3.3 * mm, "Pag. %d" % doc.page)
         canvas.restoreState()
 

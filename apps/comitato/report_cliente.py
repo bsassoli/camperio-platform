@@ -242,12 +242,12 @@ def cliente_pdf(d, path):
         canvas.drawRightString(w - 18 * mm, h - 20 * mm, "Documento riservato e personale")
         canvas.setStrokeColor(riga); canvas.setLineWidth(0.7); canvas.line(18 * mm, h - 23 * mm, w - 18 * mm, h - 23 * mm)
         canvas.setFillColor(gri); canvas.setFont("Helvetica", 6.2)
-        canvas.drawCentredString(w / 2, 12.5 * mm, _F1)
-        canvas.drawCentredString(w / 2, 10 * mm, _F2A); canvas.drawCentredString(w / 2, 8 * mm, _F2B)
-        canvas.setFont("Helvetica-Oblique", 5.9); canvas.drawCentredString(w / 2, 5.8 * mm, _DISC)
+        canvas.drawCentredString(w / 2, 15.5 * mm, _F1)
+        canvas.drawCentredString(w / 2, 13 * mm, _F2A); canvas.drawCentredString(w / 2, 11 * mm, _F2B)
+        canvas.setFont("Helvetica-Oblique", 5.9); canvas.drawCentredString(w / 2, 8.8 * mm, _DISC)
         # riga propria: il disclaimer centrato è largo abbastanza da coprire il
-        # numero di pagina se condividono la stessa riga (erano entrambi a 5.8mm)
-        canvas.setFont("Helvetica", 7); canvas.drawRightString(w - 18 * mm, 3.3 * mm, "Pag. %d" % doc.page)
+        # numero di pagina se condividono la stessa riga
+        canvas.setFont("Helvetica", 7); canvas.drawRightString(w - 18 * mm, 6.3 * mm, "Pag. %d" % doc.page)
         canvas.restoreState()
 
     def img(key, wmm, hmm):

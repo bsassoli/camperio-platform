@@ -8,9 +8,12 @@ Il runbook (`DEPLOY.md`, Parti 1–7) è **chiuso per intero**. Lo stack è espo
 giovedì 2026-09-10 11:00 UTC — il test-fire manuale dello stesso giorno ha già dato
 9/9 ETF scaricati).
 
-Resta aperto solo un punto non bloccante: il certificato TLS gira ancora sulla **CA
-interna provvisoria** (3.3 B), in attesa del certificato AD CS dall'IT (richiesta B1,
-3.3 A) — sostituzione a runbook invariato quando arriva, nessun altro impatto.
+**Aggiornamento 11/9:** installato un certificato pubblico wildcard `*.camperiosim.com`
+da CA esterna (SSL.com), non l'AD CS originariamente atteso — arrivato da un altro
+canale, verificato (chiave/certificato combacianti, catena completa a 3 certificati)
+e installato in `/etc/camperio/tls/`. Scadenza **28 marzo 2027**, da segnare per il
+rinnovo. Non serve più installare `ca.crt` sui client pilota: il certificato è
+riconosciuto pubblicamente. **Il runbook è ora chiuso per intero, nessun punto aperto.**
 
 ## Dove siamo, voce per voce
 
@@ -19,7 +22,7 @@ interna provvisoria** (3.3 B), in attesa del certificato AD CS dall'IT (richiest
 | 1 — Preparazione VM (Docker, deploy key, clone in `/opt/camperio`) | ✅ fatta |
 | 2 — Prova DEMO + test di hardening | ✅ fatta |
 | 3 — Segreti compilati in `/etc/camperio/camperio.env` | ✅ fatta (`ORA_USER`/`ORA_PWD` a bordo) |
-| 3.3 — Certificato TLS in `/etc/camperio/tls/` | ✅ CA interna provvisoria attiva (runbook 3.3 B, `deploy/tls/genera-ca-interna.sh`) — resta da sostituire col certificato AD CS quando l'IT lo consegna (B1, 3.3 A) |
+| 3.3 — Certificato TLS in `/etc/camperio/tls/` | ✅ fatta — certificato pubblico SSL.com (wildcard `*.camperiosim.com`) installato l'11/9, scadenza 28/3/2027 |
 | 4 — Prova LIVE, gate su dati reali, auth applicativa (401/200) | ✅ fatta — `data_layer.mode()` conferma `LIVE`, connesso su **ANTANA (produzione)** dal 4/9 (prima su ANTATEST per il collaudo) |
 | 5 — Unit systemd installate, `camperio.service` abilitato | ✅ fatta, e ora **avviato** |
 | 6 — Checklist pre-esposizione | ✅ fatta per intero |
@@ -113,12 +116,29 @@ viene riavviata, `camperio.service` riparte da solo (è `enabled`).
     run precedente. Lanciato a mano `docker compose run --rm -T comitato python
     scarica_etf.py` come test-fire: **9/9 ETF scaricati OK**. Timer poi
     abilitato — prossimo run giovedì 2026-09-10 11:00 UTC.
+14. **Errore Entra 90095 bloccava tutti gli utenti tranne uno** (9/9): "Admin
+    consent is required for the permissions requested by this application" —
+    dai sign-in log di Entra, tutti gli utenti tranne Luigi (che aveva
+    verosimilmente un consenso implicito da creatore dell'app registration).
+    Il blocco avveniva interamente dentro Entra, prima di raggiungere
+    `oauth2-proxy` (zero tracce nei nostri log). **Risolto** con "Grant admin
+    consent for tenant" su Entra ID → App registrations → app-ai → API
+    permissions (azione dell'IT, richiede ruolo Global/Application/Cloud
+    Application Administrator) — è una tantum, non va ripetuta per ogni nuovo
+    utente assegnato, solo se cambiano i permessi richiesti dall'app.
+15. **Concatenazione PEM senza newline** (11/9), durante l'installazione del
+    certificato pubblico SSL.com: `cat crt ca-bundle > fullchain.pem` ha
+    incollato `-----END CERTIFICATE----------BEGIN CERTIFICATE-----` sulla
+    stessa riga (il `.crt` non terminava con newline) — `nginx -s reload`
+    falliva con `PEM_read_bio_X509_AUX() failed (bad end line)`, ma nginx
+    restava sul certificato precedente senza downtime (il reload fallito non
+    tocca il processo già attivo). **Corretto** inserendo un `echo` tra i due
+    `cat` in concatenazione. Lezione: mai concatenare PEM alla cieca, verificare
+    sempre `grep -c "BEGIN CERTIFICATE"` e i punti di giunzione.
 
 ## Rimasto da fare
 
-Un solo punto, non bloccante: **sostituire la CA interna provvisoria col certificato
-AD CS** (3.3 A) quando l'IT lo consegna (richiesta B1) — procedura in `DEPLOY.md`
-3.3, nessun altro impatto sul resto dello stack.
+Nessun punto aperto.
 
 **Rollback, se mai servisse:** `sudo systemctl stop camperio` spegne tutto senza
 danno (Parte 8). Per il solo timer ETF: `sudo systemctl disable --now camperio-scarica-etf.timer`.

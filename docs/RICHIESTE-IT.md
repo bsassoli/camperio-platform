@@ -21,29 +21,27 @@ dedicata alla piattaforma.
 | Tenant ID | `OAUTH2_PROXY_OIDC_ISSUER_URL=https://login.microsoftonline.com/<TENANT_ID>/v2.0` |
 | Client ID | `OAUTH2_PROXY_CLIENT_ID` |
 | Client secret | `OAUTH2_PROXY_CLIENT_SECRET` (+ **data di scadenza** e titolare del rinnovo) |
-| objectId (GUID) del gruppo Entra abilitato | `OAUTH2_PROXY_ALLOWED_GROUPS` |
 
 ### Configurazioni da fare nell'app registration
 
-Senza queste tre, i valori qui sopra non bastano.
+Senza queste due, i valori qui sopra non bastano.
 
 1. **Redirect URI** registrato, esattamente:
    `https://app-ai.camperiosim.com/oauth2/callback`
    Una differenza anche minima (schema, slash finale) fa fallire il login *dopo*
    l'autenticazione, con un errore poco leggibile.
 
-2. **Claim `groups` emesso nel token** — *Token configuration → Add groups claim*,
-   limitato ai **gruppi assegnati all'applicazione**.
+2. **Assegnazione utenti**, in Applicazioni aziendali → app-ai: Proprietà →
+   "Assegnazione obbligatoria" = **Sì**, poi Utenti e gruppi → aggiungere solo gli
+   utenti che devono entrare.
    È il punto che si dimentica più spesso. L'autorizzazione della piattaforma è per
-   gruppo, non per dominio email: se il token non porta il claim `groups`, nessuna
-   corrispondenza è possibile e **tutti** vengono respinti con 403, inclusi gli
-   utenti autorizzati. Limitarlo ai gruppi assegnati evita anche il troncamento del
-   claim per utenti che appartengono a molti gruppi.
-
-3. **Appartenenze al gruppo abilitato**, gestite dall'IT. Per il collaudo servono due
-   utenti noti: uno **dentro** il gruppo (deve entrare) e uno **fuori** (deve ricevere
-   403). La prova con l'utente fuori gruppo è una voce obbligatoria della checklist di
-   esposizione.
+   utente assegnato, non per dominio email: senza "Assegnazione obbligatoria" = Sì,
+   **chiunque** nel tenant entra dopo il login. Nota: l'assegnazione a **gruppi**
+   richiede Azure AD Premium P1 (non disponibile su questo tenant) — si assegnano
+   singoli utenti. Per il collaudo servono due utenti noti: uno **assegnato** (deve
+   entrare) e uno **non assegnato** (Entra deve rifiutarlo già in fase di login, prima
+   di tornare all'app). La prova con l'utente non assegnato è una voce obbligatoria
+   della checklist di esposizione.
 
 ---
 

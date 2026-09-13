@@ -12,7 +12,10 @@
     </div>
     <div style="text-align:right">
       <div class="mode {{ 'live' if mode=='LIVE' else 'demo' }}">{{ 'LIVE - Oracle' if mode=='LIVE' else 'DEMO - dati in cache' }}</div>
-      {% if utente %}<div style="font-size:11px;color:#fff;opacity:.85;margin-top:6px">Utente: <b>{{ utente }}</b></div>{% endif %}
+      {% if utente %}<div style="font-size:11px;color:#fff;opacity:.85;margin-top:6px">Utente: <b>{{ utente }}</b>
+        &nbsp;|&nbsp; <a href="/oauth2/sign_out" style="color:#fff">Esci</a>
+        {% if logout_completo_url %}&nbsp;|&nbsp; <a href="/oauth2/sign_out?rd={{ logout_completo_url }}" style="color:#fff">Esci da tutto</a>{% endif %}
+      </div>{% endif %}
     </div>
   </div>
 </header>
@@ -88,7 +91,7 @@
 
 <footer><div class="fwrap">
   <div>Documento riservato - uso interno Camperio SIM S.p.A. - Comitato Investimenti</div>
-  <div>Via Camperio, 9 - 20123 Milano - Tel +39-02 30322100 - camperioSIM@camperio.net - www.camperiosim.com</div>
+  <div>Via Camperio, 9 - 20123 Milano - Tel +39 02.50020918 - CamperioSim@camperiosim.com - www.camperiosim.com</div>
   <div class="small">Consob - delibera n. 11761 del 22/12/1998 - albo n. 48 - C.F. 02342760275 - P.IVA 11791000158 - Cod. Banca d'Italia 16206/5 - FNG SIM0077</div>
 </div></footer>
 

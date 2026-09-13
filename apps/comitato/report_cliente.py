@@ -18,11 +18,12 @@ VERDE = "#1F7A4D"; ROSSO = "#B3261E"; RIGA = "#D9D6CE"; ALT = "#F4F2EC"; ORO = "
 _FUNDS = {"95ZYC2", "8W8C01", "54OPLF", "8W8C34", "8W8C45", "50QNF8", "52PZG8"}
 _DEV = {"EUR", "USD", "GBP", "CHF", "JPY", "NOK", "DKK", "SEK", "CAD"}
 
-_F1 = ("Camperio SIM S.p.A. — Via Camperio, 9 — 20123 Milano — Tel +39-02 30322100 — Fax +39-02 30322122 — "
-       "camperioSIM@camperio.net — www.camperiosim.com")
-_F2 = ("Consob delibera d'iscrizione n. 11761 del 22/12/1998 — albo n. 48 — Gestione di portafogli, Consulenza in materia di "
-       "investimenti, Ricezione e trasmissione di ordini — Cap. Soc. € 3.079.083 — C.F. 02342760275 — P.IVA 11791000158 — "
-       "REA MI-1409117 — Codice Banca d'Italia 16206/5 — Fondo Nazionale di Garanzia SIM0077.")
+_F1 = ("Camperio SIM S.p.A. — Via Camperio, 9 — 20123 Milano — Tel +39 02.50020918 — Fax +39 02.50020917 — "
+       "camperioSIM@camperiosim.com — www.camperiosim.com")
+_F2A = ("Consob delibera d'iscrizione n. 11761 del 22/12/1998 — albo n. 48 — Gestione di portafogli, Consulenza in materia di "
+        "investimenti, Ricezione e trasmissione di ordini")
+_F2B = ("Cap. Soc. € 3.079.083 — C.F. 02342760275 — P.IVA 11791000158 — REA MI-1409117 — Codice Banca d'Italia 16206/5 — "
+        "Fondo Nazionale di Garanzia SIM0077.")
 _DISC = ("Documento informativo personale, non costituisce raccomandazione personalizzata ai sensi del Reg. Consob 20307/2018. "
          "I rendimenti passati non sono indicativi di quelli futuri.")
 
@@ -241,10 +242,12 @@ def cliente_pdf(d, path):
         canvas.drawRightString(w - 18 * mm, h - 20 * mm, "Documento riservato e personale")
         canvas.setStrokeColor(riga); canvas.setLineWidth(0.7); canvas.line(18 * mm, h - 23 * mm, w - 18 * mm, h - 23 * mm)
         canvas.setFillColor(gri); canvas.setFont("Helvetica", 6.2)
-        canvas.drawCentredString(w / 2, 12.5 * mm, _F1)
-        canvas.drawCentredString(w / 2, 10 * mm, _F2[:118]); canvas.drawCentredString(w / 2, 8 * mm, _F2[118:])
-        canvas.setFont("Helvetica-Oblique", 5.9); canvas.drawCentredString(w / 2, 5.8 * mm, _DISC)
-        canvas.setFont("Helvetica", 7); canvas.drawRightString(w - 18 * mm, 5.8 * mm, "Pag. %d" % doc.page)
+        canvas.drawCentredString(w / 2, 15.5 * mm, _F1)
+        canvas.drawCentredString(w / 2, 13 * mm, _F2A); canvas.drawCentredString(w / 2, 11 * mm, _F2B)
+        canvas.setFont("Helvetica-Oblique", 5.9); canvas.drawCentredString(w / 2, 8.8 * mm, _DISC)
+        # riga propria: il disclaimer centrato è largo abbastanza da coprire il
+        # numero di pagina se condividono la stessa riga
+        canvas.setFont("Helvetica", 7); canvas.drawRightString(w - 18 * mm, 6.3 * mm, "Pag. %d" % doc.page)
         canvas.restoreState()
 
     def img(key, wmm, hmm):

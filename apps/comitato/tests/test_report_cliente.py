@@ -12,7 +12,10 @@ def test_percentuali_di_allocazione_su_nav_consfin():
         assert pct == pytest.approx(val / nav), nome   # mai (nav + der_eq)
 
 
-def test_denominatore_r1450_caso_validato():
-    # R1450, ANTASIMN 22/07/2026: esposizione 70.039,56 su NAV 103.199,94 = 67,87%
-    # (nota: il brief riporta 67,86%; l'aritmetica esatta arrotonda a 67,87 - vedi report)
-    assert round(70039.56 / 103199.94 * 100, 2) == 67.87
+def test_nav_base_resta_il_nav_di_inizio_anno():
+    """Il denominatore dell'allocazione non deve ombreggiare il NAV di inizio anno:
+    il PDF stampa «il valore e' passato da nav_base a nav»."""
+    pf = DL.get_portfolio("ANTASIMGEST", "DEMO01")
+    d = RC.build_cliente(pf, DL.REPO)
+    assert d["nav_base"] == 9_800_000.0        # fixture DEMO01_comitato
+    assert d["nav_base"] != d["nav"]

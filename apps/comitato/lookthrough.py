@@ -173,11 +173,13 @@ def build_matrix(pf, repo_dir):
            ("Oro fisico", {"Oro": oro})]
     syn_tot = _syn(tot); syn_tot["Oro"] = oro
 
-    # derivati informativi (non FX)
+    # derivati informativi (non FX): delta dei derivati su indice azionario, con segno, da WCTDD.VALOREFUT
     der = []
-    spf = next((x for x in pf.get("pod", []) if x.get("codabi") == "E35126" or "S&P" in str(x.get("des", ""))), None)
-    if spf:
-        der.append(("Future S&P 500 short (hedge equity)", {"USD": -abs(spf.get("pnet", 0)) * (spf.get("val") or 0) * 50 / 1.1358}))
+    for dv in pf.get("deriv") or []:
+        nm = (dv.get("des") or "").upper(); vf = float(dv.get("valorefut") or 0.0)
+        etf = next((e for kw, e in _IDXKW if kw in nm), None)
+        if vf and etf:
+            der.append((f"{dv.get('des')} ({'short' if vf < 0 else 'long'}, hedge equity)", {_IDX_CCY[etf]: vf}))
     callu = next((p for p in pf["positions"] if p.get("codabi") == "E35492"), None)
     if callu:
         der.append(("il call US Ultra 10Y (hedge tassi USD)", {"USD": callu.get("valorefut", 0)}))
@@ -247,6 +249,9 @@ _IDXKW = [("EURO STOXX", "EUE"), ("STOXX", "EUE"), ("SX5E", "EUE"),
           ("MSCI EM", "IEEM"), ("EM INDEX", "IEEM"), ("MXEF", "IEEM"),
           ("S&P", "IUSA"), ("SPX", "IUSA"), ("MINI FUT", "IUSA"),
           ("E-MINI", "IUSA"), ("EMINI", "IUSA"), ("MICRO", "IUSA")]
+
+# Valuta di ciascun ETF proxy indice (per l'esposizione dei derivati informativi in build_matrix)
+_IDX_CCY = {"IUSA": "USD", "EUE": "EUR", "EXS1": "EUR", "ISF": "GBP", "EXI1": "CHF", "IEEM": "USD"}
 
 def build_titoli(pf, repo_dir):
     """Costruisce la vista titoli single-name lordo/netto vs benchmark.

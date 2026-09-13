@@ -86,3 +86,20 @@ def test_senza_deriv_nessun_fallback_su_pod(repo):
     t = L.build_titoli(_pf([], pod=pod), repo)
     assert t["tot_hedge"] == 0.0
     assert t["hedge_dett"] == []
+
+
+def test_build_matrix_elenca_i_derivati_su_indice_dal_deriv(repo):
+    pf = DL.get_portfolio("ANTASIMGEST", "DEMO01")
+    pf = dict(pf, deriv=[{"des": "S&P 500 MINI FUT DIC-26", "grutit": "G12", "isin": "", "valorefut": -100_000.0}],
+              pod=[])
+    m = L.build_matrix(pf, repo)
+    voci = {lbl: d for lbl, d in m["derivati"] if "S&P" in lbl}
+    assert len(voci) == 1
+    (d,) = voci.values()
+    assert d == {"USD": -100_000.0}
+
+
+def test_nessun_codice_contratto_nel_sorgente():
+    src = open(os.path.join(os.path.dirname(L.__file__), "lookthrough.py"), encoding="utf-8").read()
+    assert "E35126" not in src
+    assert "1.1358" not in src

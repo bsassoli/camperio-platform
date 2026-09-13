@@ -261,6 +261,12 @@ def get_portfolio(schema, codcli, dal=None, al=None, data=None):
 
     pod = _q("SELECT CODABI, PNET, VAL, TO_CHAR(DATSCA,'YYYY-MM-DD') SCAD FROM " + schema +
              ".POD WHERE CODCLI=:c AND DATPOS=(SELECT MAX(DATPOS) FROM " + schema + ".POD WHERE CODCLI=:c)", {"c": codcli})
+    # Derivati detenuti direttamente (future/opzioni) con esposizione delta (VALOREFUT, in EUR e CON SEGNO):
+    # servono a nettare gli hedge su indice nel report Titoli lordo/netto. Mai per codice contratto.
+    drv = _q("SELECT t.DESTITB des, t.GRUTIT g, NVL(t.CODISIN,' ') isin, NVL(w.VALOREFUT,0) vf "
+             "FROM " + schema + ".WCTDD w JOIN " + schema + ".TIT t ON t.CODABI=w.CODABI "
+             "WHERE w.CODCLI=:c AND (t.GRUTIT LIKE 'F%' OR t.GRUTIT LIKE 'G%') AND NVL(w.VALOREFUT,0)<>0",
+             {"c": codcli})
     mov = _q("SELECT CODABI, TIPOPE, QUANTI, CTVTIT, TO_CHAR(DATOPE,'YYYY-MM-DD') DATA FROM " + schema +
              ".MOV WHERE CODCLI=:c AND TRUNC(DATOPE) BETWEEN TO_DATE(:p,'YYYY-MM-DD') AND TO_DATE(:d,'YYYY-MM-DD') ORDER BY DATOPE",
              {"c": codcli, "p": prev["D"], "d": drif})
@@ -276,6 +282,8 @@ def get_portfolio(schema, codcli, dal=None, al=None, data=None):
                 "codind": curr.get("CODIND") or "", "benchmark": ""},
         "pod": [{"codabi": r["CODABI"], "des": r["CODABI"], "pnet": r["PNET"], "val": r["VAL"],
                  "scad": r.get("SCAD") or "", "tipo": ""} for r in pod],
+        "deriv": [{"des": r["DES"] or "", "grutit": r["G"] or "", "isin": (r.get("ISIN") or "").strip(),
+                   "valorefut": float(r["VF"] or 0)} for r in drv],
         "mov": [{"codabi": r["CODABI"], "nome": r["CODABI"], "op": r.get("TIPOPE") or "", "eff": "",
                  "q": r.get("QUANTI"), "ctv": float(r.get("CTVTIT") or 0), "data": r.get("DATA") or ""}
                 for r in mov if not str(r["CODABI"]).startswith(("LIQ", "IMI", "LMS", "LMI"))],

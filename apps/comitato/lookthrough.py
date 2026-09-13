@@ -199,22 +199,51 @@ def _norm(s):
     k = " ".join(toks[:2])
     return _ALIAS.get(k, k)
 
+def _pct_ishares(s):
+    """Converte una percentuale iShares in frazione. Regge IT ('8,27') ed EN ('8.27')."""
+    s = str(s).replace("%", "").strip()
+    if "," in s:  # formato IT: '.' = migliaia, ',' = decimali
+        s = s.replace(".", "").replace(",", ".")
+    return float(s) / 100
+
 def parse_ishares(path):
-    """Ritorna [(nome, peso_frazione)] delle partecipazioni azionarie di un CSV iShares."""
+    """Ritorna [(nome, peso_frazione)] delle partecipazioni azionarie di un CSV iShares.
+    Header-driven: individua le colonne dai nomi di intestazione, quindi regge sia il
+    formato storico sia quello nuovo (con colonna 'Settore' in piu') e le versioni IT/EN."""
     txt = open(path, encoding="utf-8-sig").read().splitlines()
     try:
         st = next(i for i, l in enumerate(txt) if l.startswith("Ticker"))
     except StopIteration:
         return []
+    rows = list(csv.reader(txt[st:]))
+    if not rows:
+        return []
+    hdr = [h.strip().lower() for h in rows[0]]
+    def col(*names):
+        for n in names:
+            for i, h in enumerate(hdr):
+                if h == n or h.startswith(n):
+                    return i
+        return -1
+    i_name = col("nome", "name")
+    i_asset = col("asset class", "classe di attivit", "classe")
+    i_weight = col("ponderazione", "weight (%)", "weight")
+    if i_name < 0 or i_weight < 0:
+        return []
+    EQ = {"azionario", "equity", "azioni"}
     out = []
-    for row in csv.reader(txt[st + 1:]):
-        if len(row) < 6 or row[3].strip() != "Azionario":
+    for row in rows[1:]:
+        if len(row) <= max(i_name, i_weight, i_asset):
+            continue
+        if i_asset >= 0 and row[i_asset].strip().lower() not in EQ:
             continue
         try:
-            w = float(row[5].replace(".", "").replace(",", ".").replace("%", "")) / 100
+            w = _pct_ishares(row[i_weight])
         except Exception:
             continue
-        out.append((row[1].strip(), w))
+        nome = row[i_name].strip()
+        if nome:
+            out.append((nome, w))
     return out
 
 def _find_csv(repo_dir, prefix):

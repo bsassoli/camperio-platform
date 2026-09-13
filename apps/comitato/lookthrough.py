@@ -240,6 +240,14 @@ def _fund_nav(rows):
 # DELTA: indice -> ETF proxy
 _IDX_ETF = {"SPX": "IUSA", "SX5E": "EUE", "DAX": "EXS1", "UKX": "ISF", "SMI": "EXI1"}
 
+# Derivati su indice del portafoglio: keyword nel nome (TIT.DESTITB) → ETF dell'indice.
+# Mai per codice contratto (cambia a ogni roll). Ordine: keyword più specifiche prima.
+_IDXKW = [("EURO STOXX", "EUE"), ("STOXX", "EUE"), ("SX5E", "EUE"),
+          ("DAX", "EXS1"), ("FTSE", "ISF"), ("UKX", "ISF"), ("SMI", "EXI1"),
+          ("MSCI EM", "IEEM"), ("EM INDEX", "IEEM"), ("MXEF", "IEEM"),
+          ("S&P", "IUSA"), ("SPX", "IUSA"), ("MINI FUT", "IUSA"),
+          ("E-MINI", "IUSA"), ("EMINI", "IUSA"), ("MICRO", "IUSA")]
+
 def build_titoli(pf, repo_dir):
     """Costruisce la vista titoli single-name lordo/netto vs benchmark.
     Ritorna {nav, rows[], temi[], note}."""
@@ -329,10 +337,20 @@ def build_titoli(pf, repo_dir):
     for nome, w in H["IEEM"]: A(nome, "indici", etf_hold.get("IEEM", 0) * w, "ETF IEEM")
     for nome, w in H["EXS3"]: A(nome, "indici", etf_hold.get("EXS3", 0) * w, "ETF MDAX")
 
-    # 4) HEDGE S&P short del portafoglio
-    spf = next((x for x in pf.get("pod", []) if "S&P" in str(x.get("des", "")) or x.get("codabi") == "E35126"), None)
-    notional = abs(spf["pnet"]) * spf["val"] * 50 / 1.1358 if spf else 0.0
-    for nome, w in H["IUSA"]: A(nome, "hedge", -notional * w, None)
+    # 4) DERIVATI SU INDICE detenuti dal portafoglio (future/opzioni): esposizione delta
+    #    (WCTDD.VALOREFUT, già in EUR e CON SEGNO → negativa per gli short) ripartita sui
+    #    costituenti dell'ETF dell'indice. Robusto ai roll; esclude tasso/FX/commodity/single-name.
+    notional = 0.0; hedge_dett = []
+    for dv in pf.get("deriv") or []:
+        nm = (dv.get("des") or "").upper(); vf = float(dv.get("valorefut") or 0.0)
+        if not vf:
+            continue
+        etf = next((e for kw, e in _IDXKW if kw in nm), None)
+        if not etf or not H.get(etf):
+            continue  # non su indice azionario, o ETF senza CSV nel repository: non entra nel netto
+        notional += vf
+        hedge_dett.append({"nome": dv.get("des"), "valorefut": vf, "indice": etf})
+        for nome, w in H[etf]: A(nome, "hedge", vf * w, None)
 
     # 5) BENCHMARK titoli (20% IUSA + 20% EUN + 10% IEEM)
     bench = defaultdict(float)
@@ -363,7 +381,7 @@ def build_titoli(pf, repo_dir):
     tot_idx = sum(d["indici"] for d in agg.values())
     tot_hed = sum(d["hedge"] for d in agg.values())
     return {"nav": nav, "rows": rows, "temi": temi,
-            "n": len(rows), "hedge_notional": notional, "fonti": list(fund_hold.keys()),
+            "n": len(rows), "hedge_notional": notional, "hedge_dett": hedge_dett, "fonti": list(fund_hold.keys()),
             "tot_diretto": tot_dir, "tot_fondi": tot_fon, "tot_indici": tot_idx,
             "tot_hedge": tot_hed, "tot_netto": tot_dir + tot_fon + tot_idx + tot_hed}
 
@@ -485,7 +503,7 @@ def matrice_excel(m, path):
 def titoli_html(t):
     nav = t["nav"]
     head = ('<div class="rh"><div class="rt">Titoli azionari — look-through lordo/netto vs benchmark</div>'
-            f'<div class="rs">{t["n"]} nomi · lordo = diretto + fondi + indici (DELTA delta-adj, MXEF→IEEM) · netto = lordo − hedge S&P · bench 20% IUSA+20% EUN+10% IEEM</div></div>')
+            f'<div class="rs">{t["n"]} nomi · lordo = diretto + fondi + indici (DELTA delta-adj, MXEF→IEEM) · netto = lordo + delta derivati su indice del portafoglio (future/opzioni short o long) · bench 20% IUSA+20% EUN+10% IEEM</div></div>')
     # temi AI
     kp = ""
     for tema, v in t["temi"].items():
@@ -504,7 +522,7 @@ def titoli_html(t):
     return (head + '<h3>Temi AI (lordo vs benchmark)</h3><div class="kp">' + kp + '</div>'
             + f'<h3>Primi 30 titoli (su {t["n"]}) — la tabella completa è nell\'Excel</h3>'
             + '<div style="overflow-x:auto"><table><thead><tr><th class=r>#</th><th>Titolo</th><th>Fonte</th><th>Tema AI</th>'
-            + '<th class=r>€ lordo</th><th class=r>% lordo</th><th class=r>Hedge S&P</th><th class=r>€ netto</th>'
+            + '<th class=r>€ lordo</th><th class=r>% lordo</th><th class=r>Delta indice</th><th class=r>€ netto</th>'
             + '<th class=r>% netto</th><th class=r>% bench</th><th class=r>Δ p.p.</th></tr></thead><tbody>'
             + rows + '</tbody></table></div>')
 
@@ -520,9 +538,9 @@ def titoli_excel(t, path):
     ws["A1"] = "Titoli azionari - look-through LORDO/NETTO vs benchmark - Linea Camperio"
     ws["A1"].font = Font(bold=True, size=13, color=BLU)
     ws["A2"] = ("Lordo = diretto + equity fondi + indici fondi (DELTA delta-adj: S&P->IUSA, EuroStoxx->EUE, DAX->EXS1, "
-                "FTSE->ISF, SMI->EXI1; Superdiscovery MXEF->IEEM). Netto = lordo - hedge S&P short. Bench = 20% IUSA + 20% EUN + 10% IEEM.")
+                "FTSE->ISF, SMI->EXI1; Superdiscovery MXEF->IEEM). Netto = lordo + delta derivati su indice del portafoglio (future/opzioni short o long). Bench = 20% IUSA + 20% EUN + 10% IEEM.")
     ws["A2"].font = Font(size=8, color="666666")
-    hdr = ["#", "Titolo", "Fonte", "Tema AI", "EUR lordo", "% NAV lordo", "Hedge S&P EUR", "EUR netto", "% NAV netto", "% bench", "Delta vs bench p.p."]
+    hdr = ["#", "Titolo", "Fonte", "Tema AI", "EUR lordo", "% NAV lordo", "Delta indice EUR", "EUR netto", "% NAV netto", "% bench", "Delta vs bench p.p."]
     for j, h in enumerate(hdr, 1):
         c = ws.cell(row=4, column=j, value=h); c.fill = hfill; c.font = hfont; c.alignment = Alignment(horizontal="center", wrap_text=True)
     r = 5
@@ -612,7 +630,7 @@ def matrice_word(m, path):
     d.save(path); return path
 
 def titoli_word(t, path):
-    d = _doc("Titoli azionari — look-through lordo/netto vs benchmark", f"{t['n']} nomi · diretto + fondi + indici (delta-adj) − hedge S&P · bench 20/20/10")
+    d = _doc("Titoli azionari — look-through lordo/netto vs benchmark", f"{t['n']} nomi · diretto + fondi + indici (delta-adj) + delta derivati su indice del portafoglio (future/opzioni) · bench 20/20/10")
     d.add_paragraph().add_run("Temi AI").bold = True
     _table(d, ["Tema", "% lordo", "% netto", "% bench", "Δ lordo p.p."],
            [[k, pct(v["lordo"]*100), pct(v["netto"]*100), pct(v["bench"]*100,2,seg=False), pct((v["lordo"]-v["bench"])*100)] for k, v in t["temi"].items()])

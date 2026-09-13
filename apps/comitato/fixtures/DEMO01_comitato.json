@@ -4,8 +4,8 @@
   "tbmk_al": 103.8, "tbmk_dal": 103.2, "tbmk_base": 100.0,
   "bench": "BM 60/40 GLOBALE", "der_eq": -492957.0,
   "deriv_pos": [
-    {"nome": "S&P 500 FUTURE SET26 (SHORT)", "isin": "", "valorefut": -492957.0, "valmer": 0.0},
-    {"nome": "IL CALL US ULTRA 10Y", "isin": "", "valorefut": 300000.0, "valmer": 30000.0}
+    {"nome": "S&P 500 FUTURE SET26 (SHORT)", "isin": "", "valorefut": -492957.0, "valmer": 0.0, "equity": true},
+    {"nome": "IL CALL US ULTRA 10Y", "isin": "", "valorefut": 300000.0, "valmer": 30000.0, "equity": false}
   ],
   "comp": [
     {"macro": "Fondo DELTA UCITS", "val_al": 1500000.0, "val_dal": 1480000.0},

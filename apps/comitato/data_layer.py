@@ -375,6 +375,17 @@ def price_changes(schema, codcli, dal, al):
         r["qty_al"] = r["qty"] - net.get(r["codabi"], 0.0)
     return {"nav": nav, "rows": out, "dal": dal, "al": al}
 
+# Derivati AZIONARI vs non-azionari (FX, tasso/bond, commodity): classificazione per sottostante dal nome.
+_DERIV_NONEQ = ("CURR", "EUR-", "EUR/", "/USD", "USD/", "CHF/", "EUR CHF", "FX FUT", "FX FUTURE",
+                "NOTE", "T-NOTE", "TNOTE", "BOND", "BOBL", "BUND", "BUXL", "SCHATZ", "BTP", "GILT", " OAT",
+                "EURIBOR", "SOFR", "10YR", "10-YEAR", "2YR", "5YR", "30YR", "LONG BOND", "ULTRA", " 10Y",
+                "CRUDE", "OIL", "BRENT", "COFFEE", "CORN", "COPPER", "ALUMIN", "GOLD", "SILVER",
+                "WHEAT", "SUGAR", " GAS", "COCOA", "SOYBEAN", "GASOLINE", "PLATIN", "PALLAD", "NICKEL", "ZINC")
+
+def _is_equity_deriv(nome):
+    n = (nome or "").upper()
+    return not any(k in n for k in _DERIV_NONEQ)
+
 # ---------------- Report 4 "Sintesi Comitato" (Word): performance + pesi AL/DAL + operazioni ----------------
 def comitato_extra(schema, codcli, dal, al):
     """Dati aggiuntivi per la sintesi Comitato: performance (SRE TCLI/TBMK), pesi per asset class
@@ -390,17 +401,14 @@ def comitato_extra(schema, codcli, dal, al):
         return r[0] if r else None
     sa = _sre(al); sd = _sre(dal) or sa
     bq = _q("SELECT TCLI, TBMK, CONSFIN FROM " + S + ".SRE WHERE CODCLI=:c AND PERIODO < TRUNC(TO_DATE(:al,'YYYY-MM-DD'),'YEAR') ORDER BY PERIODO DESC FETCH FIRST 1 ROWS ONLY", {"c": codcli, "al": al})
-    der = _q("SELECT NVL(SUM(NVL(w.VALOREFUT,0)),0) de FROM " + S + ".WCTDD w JOIN " + S + ".TIT t ON t.CODABI=w.CODABI "
-             "WHERE w.CODCLI=:c AND (t.GRUTIT LIKE 'F%' OR t.GRUTIT LIKE 'G%') AND ("
-             "UPPER(t.DESTITB) LIKE '%S&P%' OR UPPER(t.DESTITB) LIKE '%MINI FUT%' OR UPPER(t.DESTITB) LIKE '%STOXX%' "
-             "OR UPPER(t.DESTITB) LIKE '%DAX%' OR UPPER(t.DESTITB) LIKE '%FTSE%' OR UPPER(t.DESTITB) LIKE '%SMI %' "
-             "OR UPPER(t.DESTITB) LIKE '%MSCI%' OR UPPER(t.DESTITB) LIKE '%NASDAQ%' OR UPPER(t.DESTITB) LIKE '%NIKKEI%')", {"c": codcli})
-    der_eq = float(der[0]["DE"]) if der else 0.0
     dp = _q("SELECT t.DESTITB nome, t.CODISIN isin, t.GRUTIT g, NVL(w.VALOREFUT,0) vf, NVL(w.VALMER,0) vm "
             "FROM " + S + ".WCTDD w JOIN " + S + ".TIT t ON t.CODABI=w.CODABI "
             "WHERE w.CODCLI=:c AND (t.GRUTIT LIKE 'F%' OR t.GRUTIT LIKE 'G%') AND (NVL(w.VALOREFUT,0)<>0 OR NVL(w.VALMER,0)<>0) "
             "ORDER BY ABS(NVL(w.VALOREFUT,0)) DESC", {"c": codcli})
-    deriv_pos = [{"nome": r["NOME"], "isin": r.get("ISIN") or "", "valorefut": float(r["VF"]), "valmer": float(r["VM"])} for r in dp]
+    deriv_pos = [{"nome": r["NOME"], "isin": r.get("ISIN") or "", "valorefut": float(r["VF"]), "valmer": float(r["VM"]),
+                  "equity": _is_equity_deriv(r["NOME"])} for r in dp]
+    # delta dei derivati AZIONARI per sottostante (indici E single-name; esclusi FX, tasso, commodity)
+    der_eq = sum(p["valorefut"] for p in deriv_pos if p["equity"])
     bb = bq[0] if bq else None
     comp = _q(("""SELECT macro, SUM(val_al) val_al, SUM(val_dal) val_dal FROM (
         SELECT CASE WHEN cab='95ZYC2' THEN 'Fondo DELTA UCITS'

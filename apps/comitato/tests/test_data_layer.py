@@ -48,3 +48,15 @@ def test_config_live_con_oracle_morto_solleva_mai_demo(monkeypatch):
     monkeypatch.setattr(DLmod, "_client", OracleClient(cfg=cfg))
     with pytest.raises(OracleIndisponibileError):
         DLmod.list_contratti()
+
+
+@pytest.mark.parametrize("nome,atteso", [
+    ("S&P 500 MINI FUT SET-26", True),
+    ("UBER TECHNOLOGIES CALL 90 DIC-26", True),          # single-name: azionario
+    ("EURO BOBL OTT-26 PUT 114.25", False),
+    ("IL CALL US ULTRA 10Y", False),                      # tasso USD (fixture DEMO01_comitato)
+    ("EUR/USD FX FUT DIC-26", False),
+    ("BRENT CRUDE OIL FUT", False),
+])
+def test_is_equity_deriv_per_sottostante(nome, atteso):
+    assert DL._is_equity_deriv(nome) is atteso

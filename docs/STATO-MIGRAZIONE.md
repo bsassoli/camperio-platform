@@ -1,11 +1,57 @@
-# Stato migrazione — punto fermo del 28 agosto 2026
+# Stato migrazione — punto fermo dell'11 settembre 2026
+
+**Lo stack è acceso.** L'11 settembre 2026 la Parte 7.1 del runbook (`DEPLOY.md`) è
+andata a buon fine: `camperio.service` avviato, i tre container su, la 443 aperta, e il
+login Entra con un utente **dentro** il gruppo abilitato apre l'app Comitato. La VM
+non è più spenta: da qui in avanti "tornare indietro" è la Parte 8 (`systemctl stop
+camperio`), non ricostruire.
+
+Il TLS è quello della **CA interna provvisoria** (3.3 B), non ancora il certificato AD
+CS della richiesta B1: ogni client che accede deve avere `ca.crt` installato.
+
+## Cosa resta per chiudere l'app Comitato
+
+In ordine, prima di comunicare l'URL ai colleghi:
+
+- [ ] **7.2 — utente fuori dal gruppo Entra → 403.** Unica voce della checklist non
+      provabile a stack chiuso; serve un collega non nel gruppo che apra il sito.
+- [ ] **Log oauth2-proxy puliti**: `docker compose logs oauth2-proxy`, nessun errore di
+      issuer o redirect.
+- [ ] **Parte 4 in LIVE**, se non rifatta dopo l'inserimento di `ORA_USER`/`ORA_PWD`:
+      `DL.mode()` → `LIVE`, gate su dati reali (4.2), auth 401/200 (4.3). Al 2 settembre
+      risultava ancora da rifare.
+- [ ] **7.3 — job ETF**: test-fire manuale dell'unit, poi `enable --now` del timer e
+      verifica del prossimo giovedì in `list-timers`.
+- [ ] **Certificato AD CS (B1)**: quando l'IT lo consegna, sovrascrivere i due file in
+      `/etc/camperio/tls/` e ricaricare nginx (3.3 A); da quel momento `ca.crt` sui
+      client non serve più.
+- [ ] **Annotare nome e objectId del gruppo Entra** usato in `OAUTH2_PROXY_ALLOWED_GROUPS`
+      (in `SECRETS.md`): oggi il valore c'è sulla VM ma non è tracciato in nessun documento.
+
+Chiuse queste, la voce `apps/comitato` del registro di migrazione (repo
+`migrate-camperio`) passa a "migrata e verificata" e il vecchio mondo corrispondente si
+spegne (regola anti-drift).
+
+## Il resto della migrazione, in breve
+
+Nel monorepo esistono `core/` e `apps/comitato`; `jobs/` e `agent/` sono vuote. Dal
+registro restano 13 job (J1–J4, J6–J9, J11–J15; J10 in standby), l'app `promotori`,
+lo strumento `margini`, e le 6 skill di `agent/`. Primo candidato: **J1 iban-snapshot**,
+per l'urgenza dell'output fantasma (voce 20 del registro). Prerequisiti ancora in mano
+a terzi: canale email dal server (voce 9, IT), destinazione backup (voce 15, IT),
+ricensimento delle skill non versionate (voce 19, Edoardo). Postgres (ADR 0010) non è
+ancora nel compose: serve per lo storico di J3 e per `agent_runs`.
+
+---
+
+# Storico — punto fermo del 28 agosto 2026 (aggiornato il 2 settembre)
 
 Primo deploy sulla VM Elmec (`app-ai.camperiosim.com`) portato fino alla **fine della
-Parte 6** del runbook (`DEPLOY.md`). I blocchi per la Parte 7 sono **due**,
-entrambi in attesa di consegne esterne: il **certificato TLS** (richiesta B1, IT) e le
-**credenziali Oracle** `ORA_USER`/`ORA_PWD` (richiesta A1, DBA — v. sezione dedicata).
-Il resto della configurazione è stato validato fino al punto in cui, senza quelle
-consegne, non si può andare.
+Parte 6** del runbook. I blocchi per la Parte 7 erano **due**, entrambi in attesa di
+consegne esterne: il **certificato TLS** (richiesta B1, IT) e le **credenziali Oracle**
+`ORA_USER`/`ORA_PWD` (richiesta A1, DBA — v. sezione dedicata). Il primo è stato
+aggirato il 2 settembre con la CA interna provvisoria; il secondo è stato chiuso prima
+dell'accensione dell'11 settembre.
 
 ## Dove siamo, voce per voce
 
@@ -19,7 +65,7 @@ consegne, non si può andare.
 | 5 — Unit systemd installate, `camperio.service` **abilitato ma non avviato** | ✅ fatta |
 | 6 — Checklist pre-esposizione | ✅ tranne la voce certificato |
 | 6.1 — Pre-flight `nginx -t` | ⏳ arriva fino a `cannot load certificate` — che è l'esito atteso senza certificato |
-| 7 — Accensione | ❌ **non fatta** (un tentativo prematuro, rientrato: v. sotto) |
+| 7 — Accensione | ✅ **fatta l'11 settembre 2026** (7.1 + login utente in gruppo); 7.2 utente fuori gruppo e 7.3 timer ETF ancora aperte — v. in cima |
 
 **Stato della VM al momento dello stop:** stack Compose spento
 (`sudo systemctl stop camperio`), nessun container attivo, nessuna porta esposta.
@@ -88,7 +134,7 @@ dirottava nel bridge Docker ogni risposta verso i client aziendali. **Correzione
 subnet fissa `192.168.238.0/24` nel compose (commit nel repo) e pool Docker ristretto
 in `/etc/docker/daemon.json` (runbook 1.2-bis, da applicare a mano sulla VM).
 
-## Ripresa, quando arriva il certificato
+## Ripresa, quando arriva il certificato (sequenza seguita per l'accensione)
 
 Non si rifà nulla delle Parti 1–5: unit systemd già installate e abilitate, immagine
 già costruita, segreti già compilati. La sequenza è:

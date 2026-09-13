@@ -24,3 +24,6 @@ Analisi portafoglio per comitato*
 *.tmp
 .~lock.*#
 *.bak*
+# storico pesi locale (mai nel repo, mai dati cliente)
+apps/comitato/history/*
+!apps/comitato/history/.gitkeep

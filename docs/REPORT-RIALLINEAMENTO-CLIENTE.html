@@ -1,0 +1,182 @@
+<title>Riallineamento App Comitato</title>
+<meta name="description" content="Report del riallineamento tra la versione locale dell'app Comitato e quella in produzione, con le domande aperte per il cliente.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #F6F7FA;
+    --surface: #FFFFFF;
+    --ink: #151A2E;
+    --ink-2: #4E5570;
+    --rule: #D6DAE6;
+    --blu: #151F6D;
+    --blu-2: #2E5A9E;
+    --arancio: #FF8200;
+    --arancio-ink: #A85300;
+    --tint: #E9EEF8;
+    --ok: #1F7A4D;
+    --warn-bg: #FFF3E5;
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0F1324; --surface: #171C33; --ink: #E9EBF4; --ink-2: #A9AFC6; --rule: #2C3350;
+      --blu: #8FA6E8; --blu-2: #7C9BD9; --arancio: #FF9A33; --arancio-ink: #FFB066; --tint: #1E2545; --ok: #5CC28A; --warn-bg: #2A2118;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0F1324; --surface: #171C33; --ink: #E9EBF4; --ink-2: #A9AFC6; --rule: #2C3350;
+    --blu: #8FA6E8; --blu-2: #7C9BD9; --arancio: #FF9A33; --arancio-ink: #FFB066; --tint: #1E2545; --ok: #5CC28A; --warn-bg: #2A2118;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--ground); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.55; padding-inline: 20px; padding-block: 40px 80px; }
+  .page { max-width: 760px; margin: 0 auto; }
+  header { border-bottom: 3px solid var(--blu); padding-bottom: 20px; margin-bottom: 36px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 12px; }
+  h1 { font-family: var(--serif); font-weight: 600; font-size: 34px; line-height: 1.15; margin: 0 0 10px; text-wrap: balance; color: var(--blu); }
+  .lede { font-size: 18px; color: var(--ink-2); margin: 0; max-width: 62ch; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 18px; font-size: 14px; color: var(--ink-2); }
+  .meta b { color: var(--ink); font-weight: 500; }
+  h2 { font-family: var(--serif); font-weight: 600; font-size: 24px; margin: 44px 0 14px; text-wrap: balance; }
+  h3 { font-size: 16px; font-weight: 600; margin: 24px 0 8px; }
+  p { margin: 0 0 14px; max-width: 68ch; }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; max-width: 68ch; }
+  li { margin-bottom: 8px; }
+  .summary { background: var(--tint); border-left: 4px solid var(--arancio); padding: 18px 22px; margin: 0 0 8px; }
+  .summary p:last-child { margin-bottom: 0; }
+  .figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin: 18px 0 8px; }
+  .fig { background: var(--surface); border: 1px solid var(--rule); padding: 14px 16px; }
+  .fig .n { font-family: var(--mono); font-size: 24px; font-weight: 500; color: var(--blu); font-variant-numeric: tabular-nums; }
+  .fig .l { font-size: 13px; color: var(--ink-2); margin-top: 4px; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; margin: 10px 0 18px; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--rule); }
+  th { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; }
+  .tablewrap { overflow-x: auto; }
+  .q { background: var(--surface); border: 1px solid var(--rule); border-top: 3px solid var(--blu-2); padding: 18px 20px; margin: 0 0 16px; }
+  .q h3 { margin: 0 0 8px; font-family: var(--serif); font-size: 19px; font-weight: 600; }
+  .q .why { color: var(--ink-2); font-size: 15px; }
+  .q .ask { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--rule); }
+  .q .ask b { color: var(--arancio-ink); }
+  .tag { display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border: 1px solid var(--rule); color: var(--ink-2); margin-left: 8px; vertical-align: middle; }
+  .tag.urg { border-color: var(--arancio); color: var(--arancio-ink); }
+  .deadline { background: var(--warn-bg); border: 1px solid var(--arancio); padding: 14px 18px; margin: 0 0 18px; }
+  .deadline b { color: var(--arancio-ink); }
+  .steps li { margin-bottom: 10px; }
+  .kept { color: var(--ok); font-weight: 600; }
+  .no { color: var(--arancio-ink); font-weight: 600; }
+  footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--ink-2); }
+  @media (max-width: 480px) { h1 { font-size: 28px; } body { padding-block: 24px 60px; } }
+</style>
+
+<div class="page">
+<header>
+  <p class="eyebrow">Camperio SIM · Comitato Investimenti · App di analisi portafoglio</p>
+  <h1>Riallineamento dell'app Comitato: cosa abbiamo fatto e cosa ci serve da te</h1>
+  <p class="lede">La versione che hai sviluppato in locale e quella che gira sui server aziendali erano diventate due programmi diversi. Abbiamo riportato nel programma ufficiale le tue correzioni di metodo, tenendo le protezioni già in produzione. Restano sei domande a cui solo tu puoi rispondere.</p>
+  <div class="meta">
+    <span>Data <b>13 settembre 2026</b></span>
+    <span>Riferimento <b>pacchetto «Analisi portafoglio per comitato» del 12/09</b></span>
+    <span>Stato <b>pronto per la verifica insieme</b></span>
+  </div>
+</header>
+
+<div class="summary">
+  <p><b>In due righe.</b> Le tue quattro correzioni di metodo (copertura con i future, base di calcolo delle percentuali, lettura dei file iShares, report comitato ampliato) sono ora nel programma ufficiale, ognuna con un controllo automatico che ne verifica il comportamento. Non abbiamo portato le parti in cui la versione locale è meno sicura di quella in produzione. Il passaggio in produzione della prima correzione deve avvenire <b>entro giovedì 18 settembre</b>.</p>
+</div>
+
+<h2>Perché serviva un riallineamento</h2>
+<p>Ad agosto il programma è stato messo sui server aziendali con accesso tramite login Microsoft, controlli di sicurezza e verifiche automatiche sui numeri. Nel frattempo tu hai continuato a lavorare sulla copia locale, aggiungendo correzioni importanti al metodo di calcolo. Nessuna delle due versioni conteneva le novità dell'altra.</p>
+<p>Non è colpa di nessuno: le due linee sono partite dallo stesso punto a metà agosto e sono cresciute separate. Il rischio, però, era concreto: usare la versione locale così com'era avrebbe rimosso le protezioni di produzione; lasciare la produzione così com'era avrebbe fatto sparire la copertura dai report dopo il 18 settembre.</p>
+
+<h2>Cosa abbiamo portato nel programma ufficiale</h2>
+
+<h3>1. La copertura con i future ora regge al cambio di contratto <span class="tag urg">urgente</span></h3>
+<p>Il report «Titoli azionari lordo/netto» agganciava il future sull'S&amp;P 500 tramite il codice del contratto in scadenza. Al rinnovo del contratto (18 settembre) quel codice cambia e la copertura sarebbe sparita dal report senza alcun avviso: il netto sarebbe tornato uguale al lordo. Ora il programma riconosce i future dal nome dell'indice e legge l'esposizione direttamente dal gestionale, con il segno giusto. Funziona per tutti gli indici (S&amp;P, Euro Stoxx, DAX, FTSE 100, SMI, mercati emergenti) e per posizioni sia corte sia lunghe.</p>
+<div class="figures">
+  <div class="fig"><div class="n">−328.220 €</div><div class="l">copertura S&amp;P sul portafoglio 8097S al 10/09, ora correttamente sottratta</div></div>
+  <div class="fig"><div class="n">−7,1 %</div><div class="l">del patrimonio: quanto il rischio azionario sarebbe stato sottostimato</div></div>
+  <div class="fig"><div class="n">18/09</div><div class="l">scadenza del contratto in essere: la correzione deve essere in produzione prima</div></div>
+</div>
+<p>In più: un future su un indice per cui non abbiamo il paniere (Nasdaq, Nikkei, Russell, FTSE MIB) viene riconosciuto ma non ripartito sui singoli titoli, invece di finire per errore sull'S&amp;P; e un'opzione su un singolo titolo (per esempio Micron) non viene più scambiata per un future su indice.</p>
+
+<h3>2. Le percentuali di allocazione si calcolano sul patrimonio</h3>
+<p>Nel report cliente le percentuali (azioni, obbligazioni, oro, liquidità) usavano come base «patrimonio più esposizione dei derivati», una taratura nata sul portafoglio 8097S che gonfiava la base e abbassava la percentuale azionaria. Ora la base è sempre il patrimonio di fine periodo, come in Antana. Verificato sul portafoglio R1450 al 22 luglio: esposizione azionaria 70.039,56 € su 103.199,94 €, cioè 67,87 % (Antana mostra 67,86 %: differenza di arrotondamento, la confermiamo insieme).</p>
+<p>Anche la classificazione dei derivati azionari è più precisa: le opzioni su singole azioni (Uber, Netflix, Nvidia) contano come azionarie, mentre quelle su tassi, cambi e materie prime restano escluse. Abbiamo corretto un caso limite in cui «Goldman Sachs» veniva scartata perché conteneva la parola «gold».</p>
+
+<h3>3. I file iShares si leggono anche se cambiano formato</h3>
+<p>Il programma leggeva i panieri degli ETF contando le colonne del file. Se iShares aggiunge una colonna o cambia lingua, la lettura fallisce in silenzio. Ora riconosce le colonne dal titolo, in italiano e in inglese.</p>
+
+<h3>4. Il report comitato ha le sezioni nuove</h3>
+<p>Andamento del peso azionario rispetto a settimana, mese e anno precedente; dettaglio titolo per titolo di azioni, fondi/ETF e oro con rendimento in euro e in valuta; colonna «% inizio mese» per classe; nome del cliente nel titolo. Lo storico dei pesi si accumula in avanti a ogni report: parte da zero ora e si popola settimana dopo settimana. Non è ricostruibile a posteriori, quindi lo abbiamo messo tra i dati salvati nei backup.</p>
+
+<h2>Cosa non abbiamo portato, e perché</h2>
+<div class="tablewrap">
+<table>
+  <tr><th>Comportamento della versione locale</th><th>Cosa succede in produzione</th><th>Decisione</th></tr>
+  <tr><td>Se il gestionale non risponde, il report viene prodotto lo stesso con l'ultima copia salvata, senza avviso</td><td>Il report si ferma e mostra un errore chiaro</td><td class="kept">tenuta la produzione</td></tr>
+  <tr><td>Nessun controllo che la matrice valutaria quadri con il patrimonio prima di emettere il report</td><td>Se i numeri non tornano il report viene bloccato</td><td class="kept">tenuta la produzione</td></tr>
+  <tr><td>Accesso senza login aziendale, aperto a tutta la rete</td><td>Login Microsoft, accesso solo agli utenti autorizzati</td><td class="kept">tenuta la produzione</td></tr>
+  <tr><td>Piè di pagina del PDF con i contatti vecchi (tel. 02 30322100, dominio camperio.net), riga tagliata a metà parola e numero di pagina coperto</td><td>Contatti aggiornati a settembre (02.50020918, camperiosim.com), impaginazione corretta</td><td class="kept">tenuta la produzione, <span class="no">da confermare i contatti</span></td></tr>
+  <tr><td>Variazioni di prezzo mostrate nella valuta del titolo invece che in euro</td><td>In euro, cambio incluso</td><td class="no">sospesa, è un cambio di metodo visibile al comitato</td></tr>
+  <tr><td>Analisi opzioni e «Chiedi al portafoglio»</td><td>Non presenti</td><td class="no">rinviate, dipendono dalle risposte sotto</td></tr>
+</table>
+</div>
+
+<h2>Le domande per te</h2>
+<p>Sono le sei cose che non possiamo decidere al posto tuo. Bastano risposte brevi.</p>
+
+<div class="q">
+  <h3>1. Per ricostruire le quantità a una data passata: registro ordini o registro movimenti?</h3>
+  <p class="why">Nella nota del 26 giugno avevi scritto di usare il registro <b>ordini</b>, perché quello dei movimenti mescola collaterale e trasferimenti che non riconciliano. Nella versione locale di settembre, però, il calcolo usa il registro <b>movimenti</b>, con un commento che definisce «inaffidabile» il metodo sugli ordini. Una delle due indicazioni è superata.</p>
+  <p class="ask"><b>Ci serve:</b> quale dei due vale oggi, e se hai un caso in cui uno dei due dava il numero sbagliato.</p>
+</div>
+
+<div class="q">
+  <h3>2. Il modulo «report pesi/valute/titoli» alternativo: serve ancora?</h3>
+  <p class="why">Nel pacchetto c'è un secondo modulo completo che produce gli stessi report in HTML, Word ed Excel, ma non è collegato a nessun pulsante dell'applicazione. Sembra un rifacimento lasciato a metà, oppure un lavoro futuro.</p>
+  <p class="ask"><b>Ci serve:</b> è superato, incompiuto, o qualcosa che vuoi finire? Se superato, lo archiviamo.</p>
+</div>
+
+<div class="q">
+  <h3>3. L'analisi opzioni si collega davvero a Bloomberg?</h3>
+  <p class="why">Il modulo «Analisi opzioni» prova a leggere volatilità e skew da un collegamento Bloomberg che nel pacchetto non c'è. Senza, usa solo i dati di esempio salvati ad agosto. Sul tuo computer probabilmente funziona perché quel collegamento esiste lì.</p>
+  <p class="ask"><b>Ci serve:</b> quel collegamento esiste? È un file tuo o una licenza aziendale? Sui server non c'è Bloomberg: il modulo deve girare sui dati salvati, oppure aspettare un accesso ai dati?</p>
+</div>
+
+<div class="q">
+  <h3>4. Quali sono i contatti giusti in calce ai report?</h3>
+  <p class="why">A settembre in produzione sono stati corretti telefono, fax ed email nel piè di pagina (02.50020918, camperioSIM@camperiosim.com). La tua versione locale ha ancora quelli precedenti (02 30322100, camperioSIM@camperio.net), che compaiono anche in tutti i report post-earnings.</p>
+  <p class="ask"><b>Ci serve:</b> conferma di quale set è quello corrente, così lo allineiamo ovunque una volta sola.</p>
+</div>
+
+<div class="q">
+  <h3>5. Le variazioni di prezzo: in euro o nella valuta del titolo?</h3>
+  <p class="why">La tua versione mostra nel report «Variazioni» il rendimento nella valuta del titolo (quindi senza l'effetto del cambio), la produzione lo mostra in euro. È una scelta di metodo che il comitato vede direttamente.</p>
+  <p class="ask"><b>Ci serve:</b> quale delle due vuoi come dato principale; possiamo mostrare l'altra a fianco.</p>
+</div>
+
+<div class="q">
+  <h3>6. I due loghi in formato vettoriale</h3>
+  <p class="why">Nel pacchetto due file di logo differiscono da quelli in produzione solo nei colori interni (bianco contro blu e grigio). Vogliamo capire se è una modifica voluta.</p>
+  <p class="ask"><b>Ci serve:</b> quale versione dei loghi è quella ufficiale.</p>
+</div>
+
+<h2>Come e quando va in produzione</h2>
+<div class="deadline"><b>Entro giovedì 18 settembre:</b> la correzione della copertura deve essere sui server di produzione, altrimenti dal primo report successivo al rinnovo del contratto il rischio azionario risulterebbe sottostimato di circa sette punti percentuali, senza alcun segnale di errore.</div>
+<ol class="steps">
+  <li><b>Prima la correzione della copertura</b>, da sola: installazione sul server di prova, confronto del report Titoli sul portafoglio 8097S con i numeri qui sopra, poi produzione.</li>
+  <li><b>Poi tutto il resto</b> (percentuali, iShares, report comitato ampliato) in un secondo passaggio, sempre prova e poi produzione, dopo le tue risposte alle domande 1, 4 e 5.</li>
+  <li><b>Analisi opzioni e «Chiedi al portafoglio»</b> in un terzo passaggio, dopo le risposte alle domande 2 e 3.</li>
+</ol>
+<p>Per la verifica insieme ci bastano trenta minuti davanti al server di prova: report Titoli su 8097S, report cliente su R1450 al 22 luglio, report comitato su 8097S con le sezioni nuove.</p>
+
+<h2>Cosa ti chiediamo per il futuro</h2>
+<ul>
+  <li><b>Un solo programma.</b> Da ora le modifiche vanno fatte sulla versione ufficiale, non sulla copia locale; altrimenti fra due mesi ci ritroviamo con lo stesso problema. Ti prepariamo un ambiente locale che lavora su dati di esempio, senza bisogno di accesso al gestionale.</li>
+  <li><b>Il pacchetto che ci hai mandato</b> è stato messo al sicuro fuori dal repository. Conteneva anche le credenziali di accesso al gestionale e un estratto di dati reali di un cliente: per i prossimi invii basta il solo codice, senza file di configurazione e senza dati.</li>
+  <li><b>Le analisi post-earnings e gli script di calcolo manuale</b> restano fuori dal programma: sono materiale di lavoro tuo, non hanno bisogno di stare sui server.</li>
+</ul>
+
+<footer>Preparato il 13 settembre 2026 sulla base del pacchetto ricevuto il 12 settembre e del programma in produzione al 9 settembre. Tutti i numeri citati sono verificabili sul server di prova.</footer>
+</div>

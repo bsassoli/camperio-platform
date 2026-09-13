@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Data layer: accesso Oracle (sola lettura) con fallback automatico a cache JSON (demo).
 LIVE se ORA_USER/ORA_PWD/ORA_DSN sono presenti e oracledb e' installato; altrimenti DEMO."""
-import os, json, re, datetime
+import os, json, re, datetime, tempfile
 from camperio_core.portfolio import methodology as M
 from camperio_core import config as _cfg
 from camperio_core.oracle.client import OracleClient
@@ -397,17 +397,51 @@ def _is_equity_deriv(nome):
     return not any(rx.search(n) for rx in _NONEQ_RE)
 
 # ---------------- Storico peso azionario (azioni dirette + ETF) — accumulo in avanti ----------------
-_HISTDIR = os.path.join(HERE, "history")
+def _default_histdir():
+    """Storico pesi: sotto CAMPERIO_DATA in LIVE (volume persistente, spec §8), locale in DEMO.
+    In container `apps/comitato/history/` sta nel layer dell'immagine e sparisce a ogni deploy."""
+    c = _cfg.from_env()
+    if c.live:
+        return str(c.data_dir / "history")
+    return os.path.join(HERE, "history")
+
+
+_HISTDIR = _default_histdir()
+
+
+def _hist_dir():
+    """Directory dello storico, risolta a ogni chiamata: COMITATO_HISTORY ha la precedenza."""
+    return os.getenv("COMITATO_HISTORY") or _HISTDIR
+
+
+def _atomic_write_json(path, obj):
+    """Scrittura atomica: file temporaneo nella stessa directory + os.replace.
+    `open(path, "w")` tronca, e un'interruzione lascerebbe lo storico mutilato."""
+    d = os.path.dirname(path)
+    os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".pesi-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(obj, f, ensure_ascii=False, indent=1)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
 
 def _hist_file(codcli):
-    return os.path.join(_HISTDIR, "pesi_" + str(codcli).replace("/", "_").replace("\\", "_") + ".json")
+    return os.path.join(_hist_dir(), "pesi_" + str(codcli).replace("/", "_").replace("\\", "_") + ".json")
 
 def load_weight_history(codcli):
     try:
         with open(_hist_file(codcli), encoding="utf-8") as f:
-            return json.load(f)
+            h = json.load(f)
     except (OSError, ValueError):
         return []
+    return h if isinstance(h, list) else []
 
 def update_weight_history(codcli, date, eq_eur, nav):
     """Registra/aggiorna lo snapshot del peso azionario (azioni dirette+ETF) alla data; ritorna lo storico ordinato."""
@@ -416,23 +450,22 @@ def update_weight_history(codcli, date, eq_eur, nav):
                  "pct": (float(eq_eur) / float(nav)) if nav else None})
     hist.sort(key=lambda h: h.get("date") or "")
     try:
-        os.makedirs(_HISTDIR, exist_ok=True)
-        with open(_hist_file(codcli), "w", encoding="utf-8") as f:
-            json.dump(hist, f, ensure_ascii=False, indent=1)
+        _atomic_write_json(_hist_file(codcli), hist)
     except OSError as e:
         print("[data_layer] storico pesi non scrivibile:", e)
     return hist
 
 # ---------------- Storico pesi per asset class (per il capitolo "Pesi di linea") — accumulo in avanti ----------------
 def _hist_class_file(codcli):
-    return os.path.join(_HISTDIR, "pesi_classi_" + str(codcli).replace("/", "_").replace("\\", "_") + ".json")
+    return os.path.join(_hist_dir(), "pesi_classi_" + str(codcli).replace("/", "_").replace("\\", "_") + ".json")
 
 def load_class_weight_history(codcli):
     try:
         with open(_hist_class_file(codcli), encoding="utf-8") as f:
-            return json.load(f)
+            h = json.load(f)
     except (OSError, ValueError):
         return []
+    return h if isinstance(h, list) else []
 
 def update_class_weight_history(codcli, date, pesi_pct, nav):
     """Registra/aggiorna lo snapshot dei pesi per asset class (dict macro->peso % NAV) alla data;
@@ -442,9 +475,7 @@ def update_class_weight_history(codcli, date, pesi_pct, nav):
                  "pesi": {k: round(float(v), 6) for k, v in (pesi_pct or {}).items()}})
     hist.sort(key=lambda h: h.get("date") or "")
     try:
-        os.makedirs(_HISTDIR, exist_ok=True)
-        with open(_hist_class_file(codcli), "w", encoding="utf-8") as f:
-            json.dump(hist, f, ensure_ascii=False, indent=1)
+        _atomic_write_json(_hist_class_file(codcli), hist)
     except OSError as e:
         print("[data_layer] storico pesi non scrivibile:", e)
     return hist

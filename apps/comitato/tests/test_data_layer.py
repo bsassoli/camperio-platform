@@ -63,3 +63,28 @@ def test_config_live_con_oracle_morto_solleva_mai_demo(monkeypatch):
 ])
 def test_is_equity_deriv_per_sottostante(nome, atteso):
     assert DL._is_equity_deriv(nome) is atteso
+
+
+def test_storico_pesi_segue_la_env_comitato_history(tmp_path, monkeypatch):
+    """In produzione lo storico sta sul volume persistente: la directory va risolta
+    a ogni chiamata, non congelata all'import del modulo."""
+    monkeypatch.setenv("COMITATO_HISTORY", str(tmp_path))
+    DL.update_weight_history("DEMOX", "2026-08-14", 5_000_000.0, 10_000_000.0)
+    DL.update_class_weight_history("DEMOX", "2026-08-14", {"Azioni": 0.5}, 10_000_000.0)
+    assert (tmp_path / "pesi_DEMOX.json").exists()
+    assert (tmp_path / "pesi_classi_DEMOX.json").exists()
+
+
+def test_scrittura_storico_atomica_senza_file_temporanei(tmp_path, monkeypatch):
+    monkeypatch.setenv("COMITATO_HISTORY", str(tmp_path))
+    DL.update_weight_history("DEMOX", "2026-08-14", 5_000_000.0, 10_000_000.0)
+    DL.update_class_weight_history("DEMOX", "2026-08-14", {"Azioni": 0.5}, 10_000_000.0)
+    assert [p.name for p in tmp_path.iterdir() if p.suffix == ".tmp"] == []
+
+
+def test_storico_corrotto_non_di_tipo_lista_ritorna_vuoto(tmp_path, monkeypatch):
+    monkeypatch.setenv("COMITATO_HISTORY", str(tmp_path))
+    (tmp_path / "pesi_DEMOX.json").write_text("null", encoding="utf-8")
+    (tmp_path / "pesi_classi_DEMOX.json").write_text('{"date": "x"}', encoding="utf-8")
+    assert DL.load_weight_history("DEMOX") == []
+    assert DL.load_class_weight_history("DEMOX") == []

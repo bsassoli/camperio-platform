@@ -289,6 +289,15 @@ Scommenta e compila, riga per riga:
 | `OAUTH2_PROXY_COOKIE_SECRET` | generane uno: `openssl rand -base64 32 \| tr '+/' '-_'` | tu, adesso |
 | `OAUTH2_PROXY_REDIRECT_URL` / `WHITELIST_DOMAIN` | già precompilati per `app-ai.camperiosim.com` | — |
 
+> **⚠ `CAMPERIO_DATA/history/` è l'unico dato non ricostruibile.** Contiene lo storico
+> per cliente del peso azionario e dei pesi per asset class (`pesi_<codcli>.json`,
+> `pesi_classi_<codcli>.json`), scritto in accumulo in avanti a ogni generazione del
+> report Comitato: Oracle non conserva le rilevazioni passate, quindi **non si
+> rigenera**. Sta sul volume `camperio-data` (montato su `/var/lib/camperio`, già nel
+> compose — nessun volume da aggiungere) e va nel set di backup. Il resto di
+> `CAMPERIO_DATA` (`data/`, `output/`) è rigenerabile. Per puntare altrove in sviluppo:
+> `COMITATO_HISTORY=/percorso`.
+
 > **⚠ L'autorizzazione è per assegnazione utenti su Entra, non nel file `.env`.**
 > Applicazioni aziendali → app-ai → Proprietà → "Assegnazione obbligatoria" deve
 > essere **Sì**, e solo gli utenti elencati in "Utenti e gruppi" possono ottenere un
@@ -684,8 +693,8 @@ sudo systemctl stop camperio
 da `camperio.service`), ma di giovedì continuerebbe a scaricare i CSV mentre il vecchio
 mondo è tornato in carico — due sorgenti che scrivono gli stessi dati.
 
-Nessun dato vive solo sulla VM in questa fase: `data/` si ricostruisce dagli input,
-`output/` è rigenerabile.
+`data/` si ricostruisce dagli input e `output/` è rigenerabile; l'unica eccezione è
+`history/` (storico pesi, vedi Parte 3.2), che va salvato prima di distruggere il volume.
 
 ---
 

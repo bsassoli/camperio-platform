@@ -176,10 +176,10 @@ def build_matrix(pf, repo_dir):
     # derivati informativi (non FX): delta dei derivati su indice azionario, con segno, da WCTDD.VALOREFUT
     der = []
     for dv in pf.get("deriv") or []:
-        nm = (dv.get("des") or "").upper(); vf = float(dv.get("valorefut") or 0.0)
-        etf = next((e for kw, e in _IDXKW if kw in nm), None)
+        vf = float(dv.get("valorefut") or 0.0)
+        etf = _idx_etf_for(dv.get("des"))
         if vf and etf:
-            der.append((f"{dv.get('des')} ({'short' if vf < 0 else 'long'}, hedge equity)", {_IDX_CCY[etf]: vf}))
+            der.append((f"{dv.get('des')} ({'short' if vf < 0 else 'long'}, hedge equity)", {_IDX_CCY.get(etf, "EUR"): vf}))
     callu = next((p for p in pf["positions"] if p.get("codabi") == "E35492"), None)
     if callu:
         der.append(("il call US Ultra 10Y (hedge tassi USD)", {"USD": callu.get("valorefut", 0)}))
@@ -273,14 +273,28 @@ _IDX_ETF = {"SPX": "IUSA", "SX5E": "EUE", "DAX": "EXS1", "UKX": "ISF", "SMI": "E
 
 # Derivati su indice del portafoglio: keyword nel nome (TIT.DESTITB) → ETF dell'indice.
 # Mai per codice contratto (cambia a ogni roll). Ordine: keyword più specifiche prima.
-_IDXKW = [("EURO STOXX", "EUE"), ("STOXX", "EUE"), ("SX5E", "EUE"),
+# Sentinella None = indice azionario riconosciuto ma senza ETF proxy nel repository:
+# non ripartibile sui costituenti, quindi escluso dal netto. Va PRIMA delle keyword
+# generiche ("MINI FUT", "E-MINI") che altrimenti lo attribuirebbero all'S&P 500.
+_IDXKW = [("FTSE MIB", None), ("NASDAQ", None), ("NDX", None),
+          ("NIKKEI", None), ("NKY", None), ("RUSSELL", None), ("RTY", None),
+          ("EURO STOXX", "EUE"), ("STOXX", "EUE"), ("SX5E", "EUE"),
           ("DAX", "EXS1"), ("FTSE", "ISF"), ("UKX", "ISF"), ("SMI", "EXI1"),
           ("MSCI EM", "IEEM"), ("EM INDEX", "IEEM"), ("MXEF", "IEEM"),
           ("S&P", "IUSA"), ("SPX", "IUSA"), ("MINI FUT", "IUSA"),
-          ("E-MINI", "IUSA"), ("EMINI", "IUSA"), ("MICRO", "IUSA")]
+          ("E-MINI", "IUSA"), ("EMINI", "IUSA"),
+          ("MICRO E-MINI", "IUSA"), ("MICRO S&P", "IUSA")]
 
 # Valuta di ciascun ETF proxy indice (per l'esposizione dei derivati informativi in build_matrix)
 _IDX_CCY = {"IUSA": "USD", "EUE": "EUR", "EXS1": "EUR", "ISF": "GBP", "EXI1": "CHF", "IEEM": "USD"}
+
+
+def _idx_etf_for(nome):
+    """ETF proxy dell'indice sottostante al derivato, dal nome (TIT.DESTITB).
+    None = non e' un derivato su indice azionario, oppure e' un indice senza proxy
+    nel repository (sentinella in _IDXKW): in entrambi i casi non e' ripartibile."""
+    n = (nome or "").upper()
+    return next((e for kw, e in _IDXKW if kw in n), None)
 
 def build_titoli(pf, repo_dir):
     """Costruisce la vista titoli single-name lordo/netto vs benchmark.
@@ -376,10 +390,10 @@ def build_titoli(pf, repo_dir):
     #    costituenti dell'ETF dell'indice. Robusto ai roll; esclude tasso/FX/commodity/single-name.
     notional = 0.0; hedge_dett = []
     for dv in pf.get("deriv") or []:
-        nm = (dv.get("des") or "").upper(); vf = float(dv.get("valorefut") or 0.0)
+        vf = float(dv.get("valorefut") or 0.0)
         if not vf:
             continue
-        etf = next((e for kw, e in _IDXKW if kw in nm), None)
+        etf = _idx_etf_for(dv.get("des"))
         if not etf or not H.get(etf):
             continue  # non su indice azionario, o ETF senza CSV nel repository: non entra nel netto
         notional += vf

@@ -382,9 +382,19 @@ _DERIV_NONEQ = ("CURR", "EUR-", "EUR/", "/USD", "USD/", "CHF/", "EUR CHF", "FX F
                 "CRUDE", "OIL", "BRENT", "COFFEE", "CORN", "COPPER", "ALUMIN", "GOLD", "SILVER",
                 "WHEAT", "SUGAR", " GAS", "COCOA", "SOYBEAN", "GASOLINE", "PLATIN", "PALLAD", "NICKEL", "ZINC")
 
+# Le chiavi puramente alfabetiche vanno cercate a confine di parola, altrimenti il match per
+# sottostringa scarta i single-name azionari (GOLDMAN SACHS -> "GOLD", CORNING -> "CORN",
+# ULTRA CLEAN -> "ULTRA"). Le chiavi con punteggiatura o spazi restano match per sottostringa.
+_NONEQ_RE = [re.compile(r"(?<![A-Z])" + re.escape(k) + r"(?![A-Z])") for k in _DERIV_NONEQ if k.isalpha()]
+_NONEQ_SUB = tuple(k for k in _DERIV_NONEQ if not k.isalpha())
+
 def _is_equity_deriv(nome):
+    """True se il derivato ha sottostante azionario (indice o single-name); False per FX,
+    tasso/bond e commodity, riconosciuti dal nome (TIT.DESTITB)."""
     n = (nome or "").upper()
-    return not any(k in n for k in _DERIV_NONEQ)
+    if any(k in n for k in _NONEQ_SUB):
+        return False
+    return not any(rx.search(n) for rx in _NONEQ_RE)
 
 # ---------------- Storico peso azionario (azioni dirette + ETF) — accumulo in avanti ----------------
 _HISTDIR = os.path.join(HERE, "history")

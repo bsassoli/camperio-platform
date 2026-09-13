@@ -57,6 +57,9 @@ def test_config_live_con_oracle_morto_solleva_mai_demo(monkeypatch):
     ("IL CALL US ULTRA 10Y", False),                      # tasso USD (fixture DEMO01_comitato)
     ("EUR/USD FX FUT DIC-26", False),
     ("BRENT CRUDE OIL FUT", False),
+    ("GOLDMAN SACHS GROUP CALL 500", True),               # single-name: non e' l'oro
+    ("CORNING INC PUT 40", True),                         # single-name: non e' il mais
+    ("GOLD FUT DIC-26", False),                           # commodity vera
 ])
 def test_is_equity_deriv_per_sottostante(nome, atteso):
     assert DL._is_equity_deriv(nome) is atteso

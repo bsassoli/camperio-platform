@@ -60,6 +60,9 @@ def _pesi_inizio_mese(hist, al_iso):
     return past[-1] if past else None
 
 def build_comitato(pf, repo_dir):
+    """Costruisce i dati della Sintesi Comitato.
+    EFFETTO COLLATERALE: a ogni chiamata scrive in history/ lo snapshot del peso azionario
+    e dei pesi per asset class alla data del portafoglio (accumulo in avanti, non ricostruibile)."""
     meta = pf["meta"]
     info = DL.contract_info(meta["schema"], meta["codcli"])
     var = L.build_variazioni(pf, repo_dir)
@@ -164,7 +167,7 @@ def comitato_word(d, path):
     L._table(doc, ["Componente", "% NAV"],
              [["Azioni dirette", _pct(d["e_dir"])],
               ["Azionario via fondi (delta: equity + indici)", _pct(d["e_fond"], 2, True)],
-              ["Copertura derivati (hedge S&P short)", _pct(d["e_hed"], 2, True)],
+              ["Copertura derivati su indice", _pct(d["e_hed"], 2, True)],
               ["= Esposizione azionaria netta delta-adjusted", _pct(d["e_net"])],
               ["Di cui mercati emergenti (look-through)", _pct(d["em_pct"])]])
     # 3-bis. Andamento peso azionario (dirette + ETF) nel tempo
@@ -241,9 +244,10 @@ def comitato_word(d, path):
 
 def comitato_html(d):
     def cc(x): return "1F7A4D" if (x or 0) >= 0 else "B3261E"
+    def esc(x): return _html.escape(str(x or ""))   # ogni stringa da Oracle passa di qui
     titolo_linea = _html.escape(str(d.get("descli") or d.get("codcli") or "")) + " (" + _html.escape(str(d.get("codcli") or "")) + ")"
     head = (f'<div class="rh"><div class="rt">Sintesi Comitato — {titolo_linea}</div>'
-            f'<div class="rs">Periodo {d["dal"]} &#8594; {d["al"]} · benchmark {d["bench"]} · NAV {_eur(d["nav_al"])} · export in Word</div></div>')
+            f'<div class="rs">Periodo {d["dal"]} &#8594; {d["al"]} · benchmark {esc(d["bench"])} · NAV {_eur(d["nav_al"])} · export in Word</div></div>')
     kp = ('<div class="kp">'
           + f'<div class="ki"><div class="kl">Perf. periodo</div><div class="kv" style="color:#{cc(d["ret"])}">{_pct(d["ret"],2,True)}</div><div class="ks">bench {_pct(d["bmk"],2,True)} · Δ {_pct(d["dret"],2,True)} pp</div></div>'
           + f'<div class="ki"><div class="kl">Perf. YTD</div><div class="kv" style="color:#{cc(d["rytd"])}">{_pct(d["rytd"],2,True)}</div><div class="ks">bench {_pct(d["bytd"],2,True)} · Δ {_pct(d["dytd"],2,True)} pp</div></div>'
@@ -255,7 +259,7 @@ def comitato_html(d):
         body = "".join("<tr>" + "".join((f"<td class=r>{c}</td>" if i else f"<td>{c}</td>") for i, c in enumerate(r)) + "</tr>" for r in rows)
         return f'<div style="overflow-x:auto"><table><thead><tr>{th}</tr></thead><tbody>{body}</tbody></table></div>'
     comp = tbl(["Asset class / fondo", "% " + d["al"][:5], "% " + d["dal"][:5], "% inizio mese", "Δ pp"],
-               [[c["macro"], _pct(c["pa"]), _pct(c["pd"]),
+               [[esc(c["macro"]), _pct(c["pa"]), _pct(c["pd"]),
                  (_pct(c.get("pm")) if c.get("pm") is not None else "n.d."), _pct(c["d"], 2, True)] for c in d["comp"]])
     _mi = d.get("mese_info") or {}
     comp += ('<div class="note">Peso a inizio mese dalla rilevazione del ' + _it(_mi["date"]) + '.</div>'
@@ -263,7 +267,7 @@ def comitato_html(d):
     eqt = tbl(["Componente", "% NAV"],
               [["Azioni dirette", _pct(d["e_dir"])],
                ["Azionario via fondi (delta)", _pct(d["e_fond"], 2, True)],
-               ["Copertura derivati (hedge S&P)", _pct(d["e_hed"], 2, True)],
+               ["Copertura derivati su indice", _pct(d["e_hed"], 2, True)],
                ["= Azionario netto delta-adjusted", _pct(d["e_net"])],
                ["di cui Emerging Markets", _pct(d["em_pct"])]])
     p = d.get("paz") or {}
@@ -274,18 +278,18 @@ def comitato_html(d):
                 _prow("Inizio settimana", p.get("week")),
                 _prow("Inizio mese", p.get("month")),
                 _prow("Inizio anno", p.get("year"))])
-    sett = tbl(["Settore", "% NAV"], [[s, _pct(w)] for s, w in d["sett"]])
+    sett = tbl(["Settore", "% NAV"], [[esc(s), _pct(w)] for s, w in d["sett"]])
     perf = tbl(["#", "Migliori 10", "Var. %", "Peggiori 10", "Var. %"],
-               [[i + 1, d["top"][i]["name"], _pct(d["top"][i]["var"], 2, True),
-                 (d["bot"][i]["name"] if i < len(d["bot"]) else ""),
+               [[i + 1, esc(d["top"][i]["name"]), _pct(d["top"][i]["var"], 2, True),
+                 (esc(d["bot"][i]["name"]) if i < len(d["bot"]) else ""),
                  (_pct(d["bot"][i]["var"], 2, True) if i < len(d["bot"]) else "")] for i in range(min(10, len(d["top"])))])
     contr = tbl(["#", "Contributori", "p.p.", "Detrattori", "p.p."],
-                [[i + 1, d["ctop"][i]["name"], _pct(d["ctop"][i]["peso"] * d["ctop"][i]["var"], 3, True),
-                  (d["cbot"][i]["name"] if i < len(d["cbot"]) else ""),
+                [[i + 1, esc(d["ctop"][i]["name"]), _pct(d["ctop"][i]["peso"] * d["ctop"][i]["var"], 3, True),
+                  (esc(d["cbot"][i]["name"]) if i < len(d["cbot"]) else ""),
                   (_pct(d["cbot"][i]["peso"] * d["cbot"][i]["var"], 3, True) if i < len(d["cbot"]) else "")] for i in range(min(10, len(d["ctop"])))])
-    clazz = tbl(["Classe di attivo", "Contributo p.p."], [[c["macro"], _pct(c["contrib"], 3, True)] for c in d["contrib_class"]])
+    clazz = tbl(["Classe di attivo", "Contributo p.p."], [[esc(c["macro"]), _pct(c["contrib"], 3, True)] for c in d["contrib_class"]])
     trd = (tbl(["Data", "Titolo", "Operazione", "Quantità", "Prezzo", "Controvalore"],
-               [[t["data"], t["nome"], t["verso"], _num(t["qty"], 0), _num(t["prezzo"], 2), _eur(t["ctv"])] for t in d["trades"]])
+               [[esc(t["data"]), esc(t["nome"]), esc(t["verso"]), _num(t["qty"], 0), _num(t["prezzo"], 2), _eur(t["ctv"])] for t in d["trades"]])
            if d["trades"] else '<div class="note">Nessuna operazione nel periodo (esclusi cambi).</div>')
     dt = d.get("dett")
     _nd = '<div class="note">Dettaglio mensile non disponibile in questa modalità.</div>'

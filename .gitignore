@@ -14,3 +14,13 @@ data/
 outputs/
 camperio_platform.egg-info/
 *.egg-info/
+# drop del cliente (archiviato fuori repo, mai committare)
+Analisi portafoglio per comitato*
+*.zip
+*.skill
+# formati Office e scarti
+*.docx
+*.pptx
+*.tmp
+.~lock.*#
+*.bak*

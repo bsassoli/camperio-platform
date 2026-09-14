@@ -1,7 +1,16 @@
 # Solo sviluppo locale: `docker compose -f docker-compose.yml -f compose.demo.yml up -d comitato`
+# (da dentro deploy/). Monta il codice del repo dentro il container e riavvia
+# gunicorn a ogni salvataggio: si modifica sul PC, si vede subito nel browser,
+# senza ricostruire l'immagine. Nonostante il nome, non forza la modalità DEMO:
+# quella dipende solo dall'assenza delle ORA_* (vedi docs/DEPLOY.md, Parte 2).
 services:
   comitato:
     environment:
       COMITATO_AUTH: "0"
     ports:
       - "127.0.0.1:5001:5001"
+    volumes:
+      - ../core:/opt/camperio/core:ro
+      - ../apps/comitato:/opt/camperio/apps/comitato
+    command: ["gunicorn", "--bind", "0.0.0.0:5001", "--workers", "1", "--threads", "4",
+              "--timeout", "120", "--reload", "app:app"]

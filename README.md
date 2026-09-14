@@ -14,6 +14,8 @@ sintetiche — è il contratto di piattaforma: si sviluppa sul Mac senza Oracle.
     .venv/bin/python -m pytest
 
 Per lavorare sull'app Comitato: `.venv/bin/pip install -e ".[comitato]"`.
+Installazione da zero su Windows, Ubuntu e macOS: `docs/INSTALLAZIONE-LOCALE.md`.
+Regole di lavoro (branch, test, PR) per chiunque tocchi il codice: `CLAUDE.md`.
 
 Configurazione: solo variabili d'ambiente via `camperio_core.config` —
 vedi `camperio.example.env` e `docs/SECRETS.md`. Tutto in italiano.

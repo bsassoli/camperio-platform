@@ -32,6 +32,23 @@ Chiuse queste, la voce `apps/comitato` del registro di migrazione (repo
 `migrate-camperio`) passa a "migrata e verificata" e il vecchio mondo corrispondente si
 spegne (regola anti-drift).
 
+## Validazione hotfix hedge — 13 settembre 2026 (ANTATEST)
+
+- **PR #1** (hotfix hedge, merge `1dd5c34`) validata su ANTATEST: `pf['deriv']` espone
+  correttamente il future S&P 500 MINI SET-26 con segno (`valorefut` ≈ −330.071 €, LIVE,
+  portafoglio `ANTASIMGEST`/`8097S`).
+- **Trovato bug bloccante**: `hedge_dett`/`tot_hedge` risultavano vuoti. Causa: iShares ha
+  cambiato il formato del CSV holdings (colonne in italiano, ordine diverso); il parser a
+  colonne fisse su `main` restituiva silenziosamente `[]` per `IUSA_2026-09-10.csv`.
+- **Correzione**: cherry-pick del commit `daf790f` (già presente in PR #2, isolato in una PR
+  dedicata — **PR #3**, https://github.com/bsassoli/camperio-platform/pull/3, in attesa di
+  merge) — `parse_ishares` ora guidato dall'header, regge IT/EN e colonne aggiunte.
+- **Numeri letti dopo la correzione**: `hedge_dett` = 1 voce (`indice: IUSA`, `valorefut`
+  −330.071 €), `tot_hedge` ≈ −329.510 € (scarto 0,17%, entro tolleranza 0,5%). Test
+  `test_hedge.py` + `test_ishares.py`: 15/15 passed.
+- **Da fare prima della scadenza del contratto (giovedì 18/09)**: mergiare PR #3, ripetere
+  identica procedura di validazione su **ANTANA** (produzione) e registrare qui i numeri.
+
 ## Il resto della migrazione, in breve
 
 Nel monorepo esistono `core/` e `apps/comitato`; `jobs/` e `agent/` sono vuote. Dal

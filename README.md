@@ -13,7 +13,8 @@ sintetiche — è il contratto di piattaforma: si sviluppa sul Mac senza Oracle.
     python3 -m venv .venv && .venv/bin/pip install pytest
     .venv/bin/python -m pytest
 
-Per lavorare sull'app Comitato: `.venv/bin/pip install -e ".[comitato]"`.
+Per lavorare sull'app Comitato: `.venv/bin/pip install -e ".[comitato]"`; sull'app
+Promotori: `.venv/bin/pip install -e ".[promotori]"` (vedi `apps/promotori/README.md`).
 Installazione da zero su Windows, Ubuntu e macOS: `docs/INSTALLAZIONE-LOCALE.md`.
 Regole di lavoro (branch, test, PR) per chiunque tocchi il codice: `CLAUDE.md`.
 

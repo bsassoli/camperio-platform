@@ -52,8 +52,15 @@ spegne (regola anti-drift).
 ## Il resto della migrazione, in breve
 
 Nel monorepo esistono `core/` e `apps/comitato`; `jobs/` e `agent/` sono vuote. Dal
-registro restano 13 job (J1–J4, J6–J9, J11–J15; J10 in standby), l'app `promotori`,
-lo strumento `margini`, e le 6 skill di `agent/`. Primo candidato: **J1 iban-snapshot**,
+registro restano 13 job (J1–J4, J6–J9, J11–J15; J10 in standby), lo strumento
+`margini`, e le 6 skill di `agent/`.
+
+**`apps/promotori` — porting in corso** (branch `feat/app-promotori`, 15/09): stesse query
+e stessi numeri dell'artifact cowork, calcoli in Python con test, DEMO su fixture
+sintetiche. Mancano: servizio compose e location nginx (`deploy/`), gruppo Entra di accesso
+(registro: «?»), il file dei nomi dei referenti sulla VM, la validazione in LIVE contro la
+dashboard viva, e le risposte di Edoardo in `apps/promotori/DOMANDE-EDOARDO.md`. Solo
+dopo, archiviazione di `monitoraggio-promotori` (regola anti-drift). Primo candidato: **J1 iban-snapshot**,
 per l'urgenza dell'output fantasma (voce 20 del registro). Prerequisiti ancora in mano
 a terzi: canale email dal server (voce 9, IT), destinazione backup (voce 15, IT),
 ricensimento delle skill non versionate (voce 19, Edoardo). Postgres (ADR 0010) non è

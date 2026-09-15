@@ -1,0 +1,11 @@
+[
+  {"REFCOM": "D00001", "AMBITO": "RTO", "CODCLI": "DEMO-R01", "DESCLI": "Cliente Sintetico Alfa", "TIPOGE": "RTO", "DATAPER": "2021-03-15", "DATCHIU": null},
+  {"REFCOM": "D00001", "AMBITO": "RTO", "CODCLI": "DEMO-R02", "DESCLI": "Cliente Sintetico Beta", "TIPOGE": "L01", "DATAPER": "2023-06-01", "DATCHIU": null},
+  {"REFCOM": "D00001", "AMBITO": "RTO", "CODCLI": "DEMO-R03", "DESCLI": "Cliente Sintetico Delta", "TIPOGE": "RTO", "DATAPER": "2024-02-01", "DATCHIU": "2026-04-20"},
+  {"REFCOM": "D00001", "AMBITO": "RTO", "CODCLI": "DEMO-R04", "DESCLI": "Cliente Sintetico Iota", "TIPOGE": "RTO", "DATAPER": "2022-09-01", "DATCHIU": "2025-06-30"},
+  {"REFCOM": "D00002", "AMBITO": "RTO", "CODCLI": "DEMO-R11", "DESCLI": "Cliente Sintetico Eta", "TIPOGE": "L02", "DATAPER": "2025-09-01", "DATCHIU": null},
+  {"REFCOM": "D00003", "AMBITO": "RTO", "CODCLI": "DEMO-R21", "DESCLI": "Cliente Sintetico Theta", "TIPOGE": "RTO", "DATAPER": "2025-01-15", "DATCHIU": null},
+  {"REFCOM": "D00001", "AMBITO": "GPM", "CODCLI": "DEMO-G01", "DESCLI": "Cliente Sintetico Gamma", "TIPOGE": "GP1", "DATAPER": "2022-01-10", "DATCHIU": null},
+  {"REFCOM": "D00001", "AMBITO": "GPM", "CODCLI": "DEMO-G02", "DESCLI": "Cliente Sintetico Epsilon", "TIPOGE": "GP2", "DATAPER": "2026-02-01", "DATCHIU": null},
+  {"REFCOM": "D00002", "AMBITO": "GPM", "CODCLI": "DEMO-G11", "DESCLI": "Cliente Sintetico Zeta", "TIPOGE": "GP1", "DATAPER": "2020-05-05", "DATCHIU": null}
+]

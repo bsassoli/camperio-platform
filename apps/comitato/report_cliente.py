@@ -118,9 +118,11 @@ def build_cliente(pf, repo_dir, livello=1):
     bond_dir = sum(r["val"] for r in cats.get("Obbligazioni", []))
     gold = sum(r["val"] for r in cats.get("Oro", []))
     cashv = sum(r["val"] for r in cats.get("Liquidità", []))
-    base = (nav + der_eq) if (nav + der_eq) else nav  # base gestionale: patrimonio al netto del nozionale derivati azionari
-    alloc = [("Azioni", esp_az, esp_az / base), ("Obbligazioni", bond_dir, bond_dir / base),
-             ("Alternativi (Oro)", gold, gold / base), ("Liquidità", cashv, cashv / base)]
+    # denominatore dell'allocazione = patrimonio CONSFIN (come Antana): % = esposizione / NAV
+    # (fix 23/07/2026, validato su R1450). Variabile separata da `base` (= NAV di inizio anno).
+    base_alloc = nav
+    alloc = [("Azioni", esp_az, esp_az / base_alloc), ("Obbligazioni", bond_dir, bond_dir / base_alloc),
+             ("Alternativi (Oro)", gold, gold / base_alloc), ("Liquidità", cashv, cashv / base_alloc)]
     # parte obbligazionaria
     bonds = cats.get("Obbligazioni", [])
     durata = None

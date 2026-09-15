@@ -103,3 +103,19 @@ def test_nessun_codice_contratto_nel_sorgente():
     src = open(os.path.join(os.path.dirname(L.__file__), "lookthrough.py"), encoding="utf-8").read()
     assert "E35126" not in src
     assert "1.1358" not in src
+
+
+@pytest.mark.parametrize("nome,atteso", [
+    ("DAX MINI FUT DIC-26", "EXS1"),
+    ("EURO STOXX 50 MICRO FUT", "EUE"),
+    ("S&P 500 MINI FUT SET-26", "IUSA"),
+    ("MICRO E-MINI S&P 500", "IUSA"),
+    ("NASDAQ 100 MINI FUT DIC-26", None),      # indice riconosciuto, nessun ETF proxy
+    ("NIKKEI 225 MINI FUT", None),
+    ("FTSE MIB FUT DIC-26", None),             # mai ISF (FTSE 100)
+    ("FTSE 100 FUT", "ISF"),
+    ("MICRON TECHNOLOGY CALL 100", None),      # single-name, non un indice
+    ("EURO BOBL OTT-26 PUT 114.25", None),
+])
+def test_idx_etf_for_riconosce_solo_indici_con_proxy(nome, atteso):
+    assert L._idx_etf_for(nome) is atteso

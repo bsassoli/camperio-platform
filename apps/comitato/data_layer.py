@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Data layer: accesso Oracle (sola lettura) con fallback automatico a cache JSON (demo).
 LIVE se ORA_USER/ORA_PWD/ORA_DSN sono presenti e oracledb e' installato; altrimenti DEMO."""
-import os, json, re, datetime
+import os, json, re, datetime, tempfile
 from camperio_core.portfolio import methodology as M
 from camperio_core import config as _cfg
 from camperio_core.oracle.client import OracleClient
@@ -375,6 +375,111 @@ def price_changes(schema, codcli, dal, al):
         r["qty_al"] = r["qty"] - net.get(r["codabi"], 0.0)
     return {"nav": nav, "rows": out, "dal": dal, "al": al}
 
+# Derivati AZIONARI vs non-azionari (FX, tasso/bond, commodity): classificazione per sottostante dal nome.
+_DERIV_NONEQ = ("CURR", "EUR-", "EUR/", "/USD", "USD/", "CHF/", "EUR CHF", "FX FUT", "FX FUTURE",
+                "NOTE", "T-NOTE", "TNOTE", "BOND", "BOBL", "BUND", "BUXL", "SCHATZ", "BTP", "GILT", " OAT",
+                "EURIBOR", "SOFR", "10YR", "10-YEAR", "2YR", "5YR", "30YR", "LONG BOND", "ULTRA", " 10Y",
+                "CRUDE", "OIL", "BRENT", "COFFEE", "CORN", "COPPER", "ALUMIN", "GOLD", "SILVER",
+                "WHEAT", "SUGAR", " GAS", "COCOA", "SOYBEAN", "GASOLINE", "PLATIN", "PALLAD", "NICKEL", "ZINC")
+
+# Le chiavi puramente alfabetiche vanno cercate a confine di parola, altrimenti il match per
+# sottostringa scarta i single-name azionari (GOLDMAN SACHS -> "GOLD", CORNING -> "CORN",
+# ULTRA CLEAN -> "ULTRA"). Le chiavi con punteggiatura o spazi restano match per sottostringa.
+_NONEQ_RE = [re.compile(r"(?<![A-Z])" + re.escape(k) + r"(?![A-Z])") for k in _DERIV_NONEQ if k.isalpha()]
+_NONEQ_SUB = tuple(k for k in _DERIV_NONEQ if not k.isalpha())
+
+def _is_equity_deriv(nome):
+    """True se il derivato ha sottostante azionario (indice o single-name); False per FX,
+    tasso/bond e commodity, riconosciuti dal nome (TIT.DESTITB)."""
+    n = (nome or "").upper()
+    if any(k in n for k in _NONEQ_SUB):
+        return False
+    return not any(rx.search(n) for rx in _NONEQ_RE)
+
+# ---------------- Storico peso azionario (azioni dirette + ETF) — accumulo in avanti ----------------
+def _default_histdir():
+    """Storico pesi: sotto CAMPERIO_DATA in LIVE (volume persistente, spec §8), locale in DEMO.
+    In container `apps/comitato/history/` sta nel layer dell'immagine e sparisce a ogni deploy."""
+    c = _cfg.from_env()
+    if c.live:
+        return str(c.data_dir / "history")
+    return os.path.join(HERE, "history")
+
+
+_HISTDIR = _default_histdir()
+
+
+def _hist_dir():
+    """Directory dello storico, risolta a ogni chiamata: COMITATO_HISTORY ha la precedenza."""
+    return os.getenv("COMITATO_HISTORY") or _HISTDIR
+
+
+def _atomic_write_json(path, obj):
+    """Scrittura atomica: file temporaneo nella stessa directory + os.replace.
+    `open(path, "w")` tronca, e un'interruzione lascerebbe lo storico mutilato."""
+    d = os.path.dirname(path)
+    os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".pesi-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(obj, f, ensure_ascii=False, indent=1)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def _hist_file(codcli):
+    return os.path.join(_hist_dir(), "pesi_" + str(codcli).replace("/", "_").replace("\\", "_") + ".json")
+
+def load_weight_history(codcli):
+    try:
+        with open(_hist_file(codcli), encoding="utf-8") as f:
+            h = json.load(f)
+    except (OSError, ValueError):
+        return []
+    return h if isinstance(h, list) else []
+
+def update_weight_history(codcli, date, eq_eur, nav):
+    """Registra/aggiorna lo snapshot del peso azionario (azioni dirette+ETF) alla data; ritorna lo storico ordinato."""
+    hist = [h for h in load_weight_history(codcli) if h.get("date") != date]
+    hist.append({"date": date, "eq": round(float(eq_eur or 0), 2), "nav": round(float(nav or 0), 2),
+                 "pct": (float(eq_eur) / float(nav)) if nav else None})
+    hist.sort(key=lambda h: h.get("date") or "")
+    try:
+        _atomic_write_json(_hist_file(codcli), hist)
+    except OSError as e:
+        print("[data_layer] storico pesi non scrivibile:", e)
+    return hist
+
+# ---------------- Storico pesi per asset class (per il capitolo "Pesi di linea") — accumulo in avanti ----------------
+def _hist_class_file(codcli):
+    return os.path.join(_hist_dir(), "pesi_classi_" + str(codcli).replace("/", "_").replace("\\", "_") + ".json")
+
+def load_class_weight_history(codcli):
+    try:
+        with open(_hist_class_file(codcli), encoding="utf-8") as f:
+            h = json.load(f)
+    except (OSError, ValueError):
+        return []
+    return h if isinstance(h, list) else []
+
+def update_class_weight_history(codcli, date, pesi_pct, nav):
+    """Registra/aggiorna lo snapshot dei pesi per asset class (dict macro->peso % NAV) alla data;
+    ritorna lo storico ordinato. Serve a recuperare in seguito il peso 'a inizio mese' per ogni classe."""
+    hist = [h for h in load_class_weight_history(codcli) if h.get("date") != date]
+    hist.append({"date": date, "nav": round(float(nav or 0), 2),
+                 "pesi": {k: round(float(v), 6) for k, v in (pesi_pct or {}).items()}})
+    hist.sort(key=lambda h: h.get("date") or "")
+    try:
+        _atomic_write_json(_hist_class_file(codcli), hist)
+    except OSError as e:
+        print("[data_layer] storico pesi non scrivibile:", e)
+    return hist
+
 # ---------------- Report 4 "Sintesi Comitato" (Word): performance + pesi AL/DAL + operazioni ----------------
 def comitato_extra(schema, codcli, dal, al):
     """Dati aggiuntivi per la sintesi Comitato: performance (SRE TCLI/TBMK), pesi per asset class
@@ -390,17 +495,14 @@ def comitato_extra(schema, codcli, dal, al):
         return r[0] if r else None
     sa = _sre(al); sd = _sre(dal) or sa
     bq = _q("SELECT TCLI, TBMK, CONSFIN FROM " + S + ".SRE WHERE CODCLI=:c AND PERIODO < TRUNC(TO_DATE(:al,'YYYY-MM-DD'),'YEAR') ORDER BY PERIODO DESC FETCH FIRST 1 ROWS ONLY", {"c": codcli, "al": al})
-    der = _q("SELECT NVL(SUM(NVL(w.VALOREFUT,0)),0) de FROM " + S + ".WCTDD w JOIN " + S + ".TIT t ON t.CODABI=w.CODABI "
-             "WHERE w.CODCLI=:c AND (t.GRUTIT LIKE 'F%' OR t.GRUTIT LIKE 'G%') AND ("
-             "UPPER(t.DESTITB) LIKE '%S&P%' OR UPPER(t.DESTITB) LIKE '%MINI FUT%' OR UPPER(t.DESTITB) LIKE '%STOXX%' "
-             "OR UPPER(t.DESTITB) LIKE '%DAX%' OR UPPER(t.DESTITB) LIKE '%FTSE%' OR UPPER(t.DESTITB) LIKE '%SMI %' "
-             "OR UPPER(t.DESTITB) LIKE '%MSCI%' OR UPPER(t.DESTITB) LIKE '%NASDAQ%' OR UPPER(t.DESTITB) LIKE '%NIKKEI%')", {"c": codcli})
-    der_eq = float(der[0]["DE"]) if der else 0.0
     dp = _q("SELECT t.DESTITB nome, t.CODISIN isin, t.GRUTIT g, NVL(w.VALOREFUT,0) vf, NVL(w.VALMER,0) vm "
             "FROM " + S + ".WCTDD w JOIN " + S + ".TIT t ON t.CODABI=w.CODABI "
             "WHERE w.CODCLI=:c AND (t.GRUTIT LIKE 'F%' OR t.GRUTIT LIKE 'G%') AND (NVL(w.VALOREFUT,0)<>0 OR NVL(w.VALMER,0)<>0) "
             "ORDER BY ABS(NVL(w.VALOREFUT,0)) DESC", {"c": codcli})
-    deriv_pos = [{"nome": r["NOME"], "isin": r.get("ISIN") or "", "valorefut": float(r["VF"]), "valmer": float(r["VM"])} for r in dp]
+    deriv_pos = [{"nome": r["NOME"], "isin": r.get("ISIN") or "", "valorefut": float(r["VF"]), "valmer": float(r["VM"]),
+                  "equity": _is_equity_deriv(r["NOME"])} for r in dp]
+    # delta dei derivati AZIONARI per sottostante (indici E single-name; esclusi FX, tasso, commodity)
+    der_eq = sum(p["valorefut"] for p in deriv_pos if p["equity"])
     bb = bq[0] if bq else None
     comp = _q(("""SELECT macro, SUM(val_al) val_al, SUM(val_dal) val_dal FROM (
         SELECT CASE WHEN cab='95ZYC2' THEN 'Fondo DELTA UCITS'
@@ -441,6 +543,92 @@ def comitato_extra(schema, codcli, dal, al):
                     "prezzo": float(r["PREZUNI"] or 0), "data": r["DATA"],
                     "ctv": float(r["QUANTI"] or 0) * float(r["PREZUNI"] or 0) * (0.01 if (r["G"] or "").startswith("A") else 1)} for r in trades],
     }
+
+# ---------------- Dettaglio mensile: azioni titolo-per-titolo, fondi/ETF, oro (metodologia mensile validata DG) ----------------
+def _fx_case(col, dt):
+    """Frammento SQL: cambio (unita' divisa per EUR) alla data :dt per il codice divisa p.divi. EUR->1, JPY->cross."""
+    return ("CASE WHEN p.divi IN ('000',' ') THEN 1 "
+            "WHEN p.divi='071' THEN (SELECT MAX(VALMER) FROM {S}.VAL WHERE CODABI='009253' AND DATA=TO_DATE(:%s,'YYYY-MM-DD'))"
+            "*(SELECT MAX(VALMER) FROM {S}.VAL WHERE CODABI='009254' AND DATA=TO_DATE(:%s,'YYYY-MM-DD')) "
+            "ELSE (SELECT MAX(v.VALMER) FROM {S}.VAL v JOIN {S}.TIT t ON t.CODABI=v.CODABI "
+            "WHERE t.GRUTIT='V02' AND LENGTH(t.CODABI)<=3 AND t.CODABI=p.divi AND v.DATA=TO_DATE(:%s,'YYYY-MM-DD')) END %s") % (dt, dt, dt, col)
+
+def dettaglio_mensile(schema, codcli, dal, al, nav_dal, nav_al):
+    """Sezioni titolo-per-titolo tra DAL e AL: azioni dirette (+REIT single-name H22/H23), fondi/ETF, oro.
+    Quantita' ricostruite da MOV (TIPOPE 'AV%', direzione TIPOMO A/D); prezzi/cambi da VAL; dividendi da MOV DAD/DAE.
+    Performance = total-return in EUR (prezzo+cambio+dividendi) e in valuta locale (solo prezzo). Solo LIVE."""
+    if mode() == "DEMO":
+        return None
+    S = schema
+    sql = ("""SELECT p.codabi, p.nome, p.grutit, p.divi, p.isin, p.qty_now,
+        NVL(mv.net_after,0) net_after, NVL(mv.net_per,0) net_per,
+        (SELECT MAX(VALMER) FROM {S}.VAL WHERE CODABI=p.codabi AND DATA=TO_DATE(:dal,'YYYY-MM-DD')) loc_dal,
+        (SELECT MAX(VALMER) FROM {S}.VAL WHERE CODABI=p.codabi AND DATA=TO_DATE(:al,'YYYY-MM-DD')) loc_al,
+        """ + _fx_case('fx_dal', 'dal') + """, """ + _fx_case('fx_al', 'al') + """,
+        (SELECT NVL(SUM(CTVTIT),0) FROM {S}.MOV WHERE CODCLI=:c AND CODABI=p.codabi AND TIPOPE IN ('DAD','DAE')
+           AND TRUNC(DATOPE) BETWEEN TO_DATE(:dal,'YYYY-MM-DD') AND TO_DATE(:al,'YYYY-MM-DD')) div_eur,
+        (SELECT MAX(PREZUNI) FROM {S}.MOV WHERE CODCLI=:c AND CODABI=p.codabi AND TIPOPE LIKE 'AV%'
+           AND TRUNC(DATOPE) BETWEEN TO_DATE(:dal,'YYYY-MM-DD') AND TO_DATE(:al,'YYYY-MM-DD')) mov_prz
+      FROM (
+        SELECT c2.codabi, MAX(t.DESTITB) nome, MAX(t.GRUTIT) grutit, MAX(NVL(t.DIVI,'000')) divi,
+               MAX(NVL(t.CODISIN,' ')) isin, NVL(MAX(w.qty),0) qty_now
+        FROM (
+          SELECT DISTINCT CODABI codabi FROM {S}.WCTDD WHERE CODCLI=:c AND QUANTI<>0
+          UNION
+          SELECT DISTINCT CODABI FROM {S}.MOV WHERE CODCLI=:c AND TIPOPE LIKE 'AV%'
+            AND TRUNC(DATOPE) BETWEEN TO_DATE(:dal,'YYYY-MM-DD') AND TO_DATE(:al,'YYYY-MM-DD')
+        ) c2
+        JOIN {S}.TIT t ON t.CODABI=c2.codabi
+        LEFT JOIN (SELECT CODABI, SUM(QUANTI) qty FROM {S}.WCTDD WHERE CODCLI=:c GROUP BY CODABI) w ON w.CODABI=c2.codabi
+        WHERE t.GRUTIT LIKE 'E%' OR t.GRUTIT LIKE 'H%'
+        GROUP BY c2.codabi
+      ) p
+      LEFT JOIN (
+        SELECT CODABI,
+          SUM(CASE WHEN TRUNC(DATOPE) > TO_DATE(:al,'YYYY-MM-DD') THEN (CASE TIPOMO WHEN 'A' THEN QUANTI ELSE -QUANTI END) ELSE 0 END) net_after,
+          SUM(CASE WHEN TRUNC(DATOPE) BETWEEN TO_DATE(:dal,'YYYY-MM-DD') AND TO_DATE(:al,'YYYY-MM-DD') THEN (CASE TIPOMO WHEN 'A' THEN QUANTI ELSE -QUANTI END) ELSE 0 END) net_per
+        FROM {S}.MOV WHERE CODCLI=:c AND TIPOPE LIKE 'AV%' AND TIPOMO IN ('A','D') GROUP BY CODABI
+      ) mv ON mv.CODABI=p.codabi
+      ORDER BY p.nome""").format(S=S)
+    rows = _q(sql, {"c": codcli, "dal": dal, "al": al})
+
+    def f(v): return float(v) if v is not None else None
+    az, fe, oro = [], [], []
+    for r in rows:
+        g = (r["GRUTIT"] or "").upper()
+        qn = float(r["QTY_NOW"] or 0); qa = qn - float(r["NET_AFTER"] or 0); qd = qa - float(r["NET_PER"] or 0)
+        ld, la = f(r["LOC_DAL"]), f(r["LOC_AL"]); xd, xa = f(r["FX_DAL"]), f(r["FX_AL"])
+        div = float(r["DIV_EUR"] or 0); mprz = f(r["MOV_PRZ"])
+        pde = (ld / xd) if (ld is not None and xd) else None      # prezzo EUR a DAL
+        pae = (la / xa) if (la is not None and xa) else None      # prezzo EUR a AL
+        vdal = qd * pde if (pde and qd > 0.0001) else 0.0
+        val = qa * pae if (pae and qa > 0.0001) else 0.0
+        stato = "nuova" if (qd <= 0.0001 and qa > 0.0001) else ("chiusa" if (qa <= 0.0001 and qd > 0.0001) else "normale")
+        # performance
+        perf_loc = perf_eur = None
+        if stato == "normale" and ld and la:
+            perf_loc = la / ld - 1.0
+            if pde and pae:
+                perf_eur = pae / pde - 1.0 + (div / vdal if (div and vdal) else 0.0)
+        elif stato == "chiusa" and ld and mprz:
+            perf_loc = mprz / ld - 1.0
+        elif stato == "nuova" and la and mprz:
+            perf_loc = la / mprz - 1.0
+        rec = {"nome": (r["NOME"] or "").strip(), "isin": (r["ISIN"] or "").strip(), "ccy": DIVI_ISO.get((r["DIVI"] or "000").strip(), "EUR"),
+               "peso_dal": (vdal / nav_dal) if nav_dal else 0.0, "peso_al": (val / nav_al) if nav_al else 0.0,
+               "perf_eur": perf_eur, "perf_loc": perf_loc, "div": div > 0.5, "stato": stato}
+        rec["d"] = rec["peso_al"] - rec["peso_dal"]
+        if g.startswith("E") or g in ("H22", "H23"):
+            az.append(rec)
+        elif g == "H19":
+            oro.append(rec)
+        elif g.startswith("H"):
+            fe.append(rec)
+    az.sort(key=lambda x: -max(x["peso_al"], x["peso_dal"]))
+    fe.sort(key=lambda x: -max(x["peso_al"], x["peso_dal"]))
+    return {"azioni": az, "fondi_etf": fe, "oro": oro,
+            "az_tot_dal": sum(r["peso_dal"] for r in az), "az_tot_al": sum(r["peso_al"] for r in az),
+            "fe_tot_dal": sum(r["peso_dal"] for r in fe), "fe_tot_al": sum(r["peso_al"] for r in fe)}
 
 # ---------------- anagrafica contratto (per report cliente) ----------------
 def contract_info(schema, codcli):

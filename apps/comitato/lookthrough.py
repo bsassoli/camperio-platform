@@ -746,7 +746,13 @@ def _it_date(iso):
         return iso
 
 def build_variazioni(pf, repo_dir):
-    """Variazioni settimanali di prezzo (EUR/azione) dei titoli azionari diretti, dal->al."""
+    """Variazioni settimanali di prezzo dei titoli azionari diretti, dal->al.
+
+    Il dato principale e' in EUR/azione, cambio incluso (`var`): cliente e comitato
+    ragionano in euro come tutto il resto del reporting. Accanto viene esposta la
+    variazione nella valuta del titolo (`var_loc`), cosi' l'effetto cambio si legge
+    per differenza. Medie, ordinamento e conteggi rialzo/ribasso seguono l'euro.
+    """
     import data_layer as DL
     meta = pf["meta"]
     data = DL.price_changes(meta["schema"], meta["codcli"], meta.get("data_prec"), meta["data"])
@@ -758,11 +764,12 @@ def build_variazioni(pf, repo_dir):
         e_dal = (ld / fd) if (ld and fd) else None
         e_al = (la / fa) if (la and fa) else None
         var = (e_al / e_dal - 1) if (e_dal and e_al and e_dal != 0) else None
+        var_loc = (la / ld - 1) if (ld and la) else None
         qa = x.get("qty_al", x.get("qty", 0))
         peso = (qa * e_al / nav) if (e_al and nav) else 0.0
         rows.append({"name": (x.get("nome") or "").title().strip(), "ccy": x.get("ccy", "EUR"),
                      "settore": _sector_of(x.get("nome"), smap), "eur_dal": e_dal, "eur_al": e_al,
-                     "var": var, "peso": peso})
+                     "var": var, "var_loc": var_loc, "peso": peso})
     valid = [r for r in rows if r["var"] is not None]
     valid.sort(key=lambda r: -r["var"])
     novar = [r for r in rows if r["var"] is None]
@@ -783,7 +790,8 @@ def _pe(x):
 
 def variazioni_html(d):
     head = ('<div class="rh"><div class="rt">Variazioni prezzi — azioni in portafoglio</div>'
-            f'<div class="rs">Prezzo per azione in € · {d["dal"]} &#8594; {d["al"]} · var. include effetto cambio per i titoli in valuta · {d["n"]} titoli</div></div>')
+            f'<div class="rs">Prezzo per azione in € · {d["dal"]} &#8594; {d["al"]} · var. in € include effetto cambio;'
+            f' la colonna a fianco è nella valuta del titolo, l\'effetto cambio si legge per differenza · {d["n"]} titoli</div></div>')
     def card(lbl, val, sub=""):
         return f'<div class="ki"><div class="kl">{lbl}</div><div class="kv">{val}</div><div class="ks">{sub}</div></div>'
     mc = "1F7A4D" if d["media"] >= 0 else "B3261E"
@@ -799,14 +807,17 @@ def variazioni_html(d):
     for i, r in enumerate(d["rows"], 1):
         col = "1F7A4D" if (r["var"] or 0) >= 0 else "B3261E"
         vtxt = pct(r["var"]*100) if r["var"] is not None else "n.d."
+        vltxt = pct(r["var_loc"]*100) if r.get("var_loc") is not None else "n.d."
         rr += (f"<tr><td class=r>{i}</td><td><b>{r['name']}</b></td><td>{r['settore']}</td>"
                f"<td>{r['ccy']}</td><td class=r>{_pe(r['eur_dal'])}</td><td class=r>{_pe(r['eur_al'])}</td>"
-               f"<td class=r style='color:#{col}'>{vtxt}</td><td class=r>{pct(r['peso']*100,2,seg=False)}</td></tr>")
+               f"<td class=r style='color:#{col}'>{vtxt}</td><td class=r>{vltxt}</td>"
+               f"<td class=r>{pct(r['peso']*100,2,seg=False)}</td></tr>")
     return (head + '<h3>Sintesi settimana</h3>' + kp
             + '<h3>Dettaglio per titolo (ordinato per variazione)</h3>'
             + '<div style="overflow-x:auto"><table><thead><tr><th class=r>#</th><th>Titolo</th><th>Settore</th>'
             + '<th>Divisa</th><th class=r>Prezzo € ' + d["dal"][:5] + '</th><th class=r>Prezzo € ' + d["al"][:5] + '</th>'
-            + '<th class=r>Var. %</th><th class=r>% NAV</th></tr></thead><tbody>' + rr + '</tbody></table></div>')
+            + '<th class=r>Var. % €</th><th class=r>Var. % valuta</th><th class=r>% NAV</th></tr></thead><tbody>'
+            + rr + '</tbody></table></div>')
 
 def variazioni_excel(d, path):
     from openpyxl import Workbook
@@ -820,7 +831,8 @@ def variazioni_excel(d, path):
     ws["A1"] = "Variazione settimanale dei prezzi — azioni in portafoglio"
     ws["A1"].font = Font(bold=True, size=13, color=BLU)
     ws["A2"] = ("Prezzo per azione in € · " + d["dal"] + " → " + d["al"]
-                + " · var. include effetto cambio per i titoli in valuta · USO INTERNO"); ws["A2"].font = sub
+                + " · var. in € include effetto cambio; colonna a fianco nella valuta del titolo"
+                + " · USO INTERNO"); ws["A2"].font = sub
     # sintesi
     r = 4
     ws.cell(row=r, column=1, value="Sintesi settimana").font = bold; r += 1
@@ -835,7 +847,8 @@ def variazioni_excel(d, path):
         if lbl == "Peggiore" and d["worst"]: ws.cell(row=r, column=3, value=d["worst"]["name"]).font = sub
         r += 1
     r += 1
-    hdr = ["#", "Titolo", "Settore", "Divisa", "Prezzo € " + d["dal"], "Prezzo € " + d["al"], "Var. % settimana", "% NAV"]
+    hdr = ["#", "Titolo", "Settore", "Divisa", "Prezzo € " + d["dal"], "Prezzo € " + d["al"],
+           "Var. % settimana (€)", "Var. % settimana (valuta)", "% NAV"]
     hrow = r
     for j, h in enumerate(hdr, 1):
         c = ws.cell(row=hrow, column=j, value=h); c.fill = hfill; c.font = hfont
@@ -845,22 +858,23 @@ def variazioni_excel(d, path):
         vals = [i, x["name"], x["settore"], x["ccy"],
                 round(x["eur_dal"], 4) if x["eur_dal"] is not None else None,
                 round(x["eur_al"], 4) if x["eur_al"] is not None else None,
-                x["var"], x["peso"]]
+                x["var"], x.get("var_loc"), x["peso"]]
         for j, v in enumerate(vals, 1):
             c = ws.cell(row=r, column=j, value=v); c.border = border
             if j in (5, 6): c.number_format = "#,##0.00"
-            if j == 7: c.number_format = "+0.00%;-0.00%"
-            if j == 8: c.number_format = "0.00%"
+            if j in (7, 8): c.number_format = "+0.00%;-0.00%"
+            if j == 9: c.number_format = "0.00%"
             if r % 2 == 0: c.fill = alt
         r += 1
-    ws.freeze_panes = "A" + str(hrow + 1); ws.auto_filter.ref = "A" + str(hrow) + ":H" + str(r - 1)
-    for col, w in zip("ABCDEFGH", (5, 32, 24, 8, 16, 16, 15, 10)):
+    ws.freeze_panes = "A" + str(hrow + 1); ws.auto_filter.ref = "A" + str(hrow) + ":I" + str(r - 1)
+    for col, w in zip("ABCDEFGHI", (5, 32, 24, 8, 16, 16, 15, 15, 10)):
         ws.column_dimensions[col].width = w
     wb.save(path); return path
 
 def variazioni_word(d, path):
     doc = _doc("Variazioni prezzi — azioni in portafoglio",
-               "Prezzo per azione in € · " + d["dal"] + " → " + d["al"] + " · var. include effetto cambio")
+               "Prezzo per azione in € · " + d["dal"] + " → " + d["al"]
+               + " · var. in € include effetto cambio; colonna a fianco nella valuta del titolo")
     p = doc.add_paragraph()
     p.add_run("Sintesi: ").bold = True
     best = (d["best"]["name"] + " " + pct(d["best"]["var"]*100)) if d["best"] else "—"
@@ -868,8 +882,11 @@ def variazioni_word(d, path):
     p.add_run("media semplice " + pct(d["media"]*100) + " · media ponderata " + pct(d["media_w"]*100)
               + " · in rialzo " + str(d["up"]) + " / in ribasso " + str(d["down"])
               + " · migliore " + best + " · peggiore " + worst + ".")
-    _table(doc, ["#", "Titolo", "Settore", "Div.", "Prezzo € " + d["dal"][:5], "Prezzo € " + d["al"][:5], "Var. %", "% NAV"],
+    _table(doc, ["#", "Titolo", "Settore", "Div.", "Prezzo € " + d["dal"][:5], "Prezzo € " + d["al"][:5],
+                 "Var. % €", "Var. % val.", "% NAV"],
            [[i, x["name"], x["settore"], x["ccy"], _pe(x["eur_dal"]), _pe(x["eur_al"]),
-             (pct(x["var"]*100) if x["var"] is not None else "n.d."), pct(x["peso"]*100, 2, seg=False)]
+             (pct(x["var"]*100) if x["var"] is not None else "n.d."),
+             (pct(x["var_loc"]*100) if x.get("var_loc") is not None else "n.d."),
+             pct(x["peso"]*100, 2, seg=False)]
             for i, x in enumerate(d["rows"], 1)])
     doc.save(path); return path

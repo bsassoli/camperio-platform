@@ -1,6 +1,6 @@
 # Censimento «Nuova versione» vs monorepo — e piano di riallineamento
 
-Data analisi: 12/09/2026 · Verifica e correzione: 13/09/2026 (controllo riga per riga contro codice, git e mtime) · Analisi in sola lettura, nessun file dell'applicazione modificato.
+Data analisi: 12/09/2026 · Verifica e correzione: 13/09/2026 (controllo riga per riga contro codice, git e mtime) · **Risposte dell'autore ai punti aperti: 16/09/2026** (vedi §6) · Analisi in sola lettura, nessun file dell'applicazione modificato.
 
 - **VECCHIA** = `camperio-platform/` (monorepo `core/` + `apps/comitato/` + `deploy/`, in produzione su **ANTANA**, test su **ANTATEST**).
 - **NUOVA** = `Analisi portafoglio per comitato/` **alla radice del repo**, più lo zip gemello `Analisi portafoglio per comitato.zip` (stessi 611 file). Entrambi untracked; l'app vive in `Comitato_App/`.
@@ -91,7 +91,9 @@ Nessun import di `camperio_core` in tutto il file: è assenza vera di codice equ
 
 Assente anche `_default_repo()` (funzione locale di `apps/comitato/data_layer.py`, righe 24-29, che passa da `camperio_core.config.from_env()`), sostituita da `COMITATO_REPO` env var con default `<drop>/Repository_Fondi`.
 
-**Punto da chiarire prima del back-port:** la NUOVA riscrive la fonte dei movimenti da `ORD.TIPOPE` (euristica sui prefissi stringa, definita «inaffidabile» nei commenti del codice nuovo stesso) a **`MOV.TIPOMO` ('A'/'D') + `CTVTIT`** già in EUR. Tecnicamente più robusto — ma il changelog del **26/06/2026 prescrive l'opposto** (riga 77: «Usare **ORD** (solo trade) e NON MOV (mescola movimenti tecnici: collaterale, trasferimenti, che non riconciliano)»), e nessuna voce successiva lo revoca. La NUOVA è per giunta **mista**: `price_changes` usa ancora ORD per l'aggiustamento post-AL (righe 370-371, identiche alla VECCHIA) e la docstring di `comitato_extra` parla ancora di «registro ORD». Va deciso con l'autore prima di portarla.
+**Punto da chiarire prima del back-port:** la NUOVA riscrive la fonte dei movimenti da `ORD.TIPOPE` (euristica sui prefissi stringa, definita «inaffidabile» nei commenti del codice nuovo stesso) a **`MOV.TIPOMO` ('A'/'D') + `CTVTIT`** già in EUR. Tecnicamente più robusto — ma il changelog del **26/06/2026 prescrive l'opposto** (riga 77: «Usare **ORD** (solo trade) e NON MOV (mescola movimenti tecnici: collaterale, trasferimenti, che non riconciliano)»), e nessuna voce successiva lo revoca. La NUOVA è per giunta **mista**: `price_changes` usa ancora ORD per l'aggiustamento post-AL (righe 370-371, identiche alla VECCHIA) e la docstring di `comitato_extra` parla ancora di «registro ORD».
+
+**Deciso il 16/09/2026:** vale **MOV**, cioè la versione di settembre; il metodo sugli ordini non regge sui conti con operatività in derivati o con rettifiche (caso in arrivo dall'autore), e il changelog del 26/06 è superato. Il back-port è però **subordinato a una quadratura** richiesta dall'autore: due conti a una data passata, ORD e MOV a confronto, con analisi delle righe che spiegano l'eventuale differenza. Nello stesso passaggio va allineato `price_changes` e corretta la docstring di `comitato_extra`, altrimenti il monorepo resta misto come la NUOVA.
 
 ### 3.3 `lookthrough.py`
 
@@ -152,7 +154,7 @@ Identico byte a byte (a meno di CRLF/LF). Nessun intervento.
 | `reports.py` | 243 | Modulo completo report pesi/fx/titoli in HTML/Word/Excel (`compute`, `html_fragment`, `word`, `excel`) | **No — orfano.** Zero riferimenti in `app.py`, che usa `report_comitato.py` con API diversa |
 | `diagnostica_hedge.py` | 61 | Script diagnostico manuale sugli hedge, con `diagnostica.bat` | **No** — uso manuale |
 
-`reports.py` è codice maturo ma **duplicato/orfano** rispetto a `report_comitato.py`. Prima di integrarlo va chiarito con l'autore se è un refactoring incompiuto, codice futuro non ancora cablato, o materiale superato. `diagnostica_hedge.py`, se lo si tiene, va in un `tools/` separato, non nel percorso applicativo.
+`reports.py` è codice maturo ma **duplicato/orfano** rispetto a `report_comitato.py`. **Chiarito il 16/09:** è un rifacimento a metà che l'autore vuole completare lui → **resta fuori dal programma ufficiale**, non entra nel monorepo e non compare nel piano di back-port. `diagnostica_hedge.py`, se lo si tiene, va in un `tools/` separato, non nel percorso applicativo.
 
 ### 4.2 Asset non-Python
 
@@ -233,7 +235,9 @@ Nota di sicurezza: **entrambe** le versioni leggono `X-Remote-User`/`X-Forwarded
 | 5 | Espansione additiva del report comitato (3-bis, 8, 9, 10; storico JSON; `contract_info`) | `report_comitato.py`, `data_layer.py` | media, **dopo** il ripristino del fail-safe |
 | 6 | `opzioni.py` + `qa.py` + `templates/opzioni.html` + CSS QA | nuovi in `apps/comitato/` | media |
 | 7 | `MACRO_COLOR` riconciliato dentro `branding/palette.py` | `core/camperio_core/branding/palette.py` | bassa |
-| 8 | `variazioni_*` in valuta locale | `lookthrough.py` | bassa, è un cambio di metodologia visibile all'utente: da confermare |
+| 8 | `variazioni_*`: **colonna** in valuta locale **accanto** all'euro (l'euro resta il dato principale, medie e ordinamento inclusi) — deciso dall'autore il 16/09, non è più una sostituzione | `lookthrough.py` | bassa |
+| 9 | `MOV.TIPOMO`+`CTVTIT` al posto di `ORD.TIPOPE` per le quantità alla data AL — deciso il 16/09, **subordinato alla quadratura** ORD vs MOV su due conti a una data passata; include l'allineamento di `price_changes`, che usa ancora ORD | `data_layer.py` | media, **dopo** la quadratura |
+| 10 | Logo dei Word dal **JPG a fondo bianco** (regola fissa dell'autore, 16/09); serve l'asset ufficiale dall'ufficio e una verifica visiva della fascia d'intestazione | `apps/comitato/lookthrough.py` (`_doc`), `static/` | bassa, bloccata sull'asset |
 
 ### Da NON portare (differenze in cui vale il monorepo)
 
@@ -241,17 +245,20 @@ Nota di sicurezza: **entrambe** le versioni leggono `X-Remote-User`/`X-Forwarded
 2. Assenza di SSO/logout Entra, controllo `X-Auth-Request-User`, `html.escape()`; e il bind su `0.0.0.0`.
 3. Fallback DEMO silenzioso in `_connect()`.
 4. Il footer PDF pre-fix (split a metà parola, footer 3 mm più basso, sovrapposizione disclaimer/numero pagina).
-5. Il cambio dei contatti aziendali (telefono/fax/email), salvo conferma esplicita dell'ufficio.
+5. Il cambio dei contatti aziendali (telefono/fax/email): **confermato dall'autore il 16/09** che il set corrente è quello del monorepo (`Tel +39 02.50020918`, `camperioSIM@camperiosim.com`). Il set della NUOVA è superato.
 6. Gli import locali al posto di `camperio_core` (pattern «copia locale»): annullano la propagazione dei fix del core.
 7. `_motore/` ed `Earnings Review/` nel repo applicativo.
 
-### Da chiarire con l'autore prima di decidere
+### Chiarito con l'autore — risposte del 16/09/2026
 
-- **`ORD` o `MOV`** per ricostruire le quantità alla data AL: il codice nuovo e il changelog del 26/06 si contraddicono.
-- **`reports.py`**: superato, refactoring incompiuto, o codice futuro?
-- **`blpapi_fetch`**: esiste sulla macchina dell'autore? Senza, `opzioni.py` gira solo su dati seed.
-- **Contatti aziendali**: quale set è quello corrente?
-- **2 loghi SVG** che differiscono.
+Le cinque domande aperte sono state poste all'autore con `docs/REPORT-RIALLINEAMENTO-CLIENTE.md` (sei domande, la quinta e la sesta articolate lì) e hanno ricevuto risposta il **16/09/2026**. Sintesi tecnica:
+
+- **`ORD` o `MOV`** per le quantità alla data AL → **vale `MOV`** (la versione di settembre): il metodo sugli ordini non regge sui conti con operatività in derivati o con rettifiche; l'autore manda il caso. **Condizione posta dall'autore:** prima di chiudere, quadratura su un paio di conti a una data passata con i **due metodi a confronto**; se divergono va analizzato su cosa. Il changelog del 26/06 è quindi superato, ma solo dopo la quadratura. Da allineare nello stesso passaggio `price_changes`, che usa ancora ORD (righe 370-371) — la versione NUOVA resta mista.
+- **`reports.py`** → **fuori dal programma ufficiale per ora**: è un rifacimento a metà che l'autore vuole completare. Non entra nel monorepo e non compare nel piano; resta nel pacchetto archiviato fuori dal repository.
+- **`blpapi_fetch` / Bloomberg** → il collegamento esiste **solo sulla postazione dell'autore** ed è il **terminale Bloomberg con licenza nominativa**: non replicabile su server, non condivisibile. Sui server il modulo opzioni deve girare con **API che prendono il dato dal PC dell'autore o dalla postazione Bloomberg**. Conseguenze: `opzioni.py` non può dipendere da `blpapi` lato server (vincolo di licenza, non solo tecnico); serve un canale dati dedicato, da concordare con l'IT (chi espone l'API, come si autentica, comportamento a postazione spenta); finché non esiste, il modulo gira sui dati salvati e **deve dichiararlo nel report** invece di far sembrare il dato aggiornato. Il punto 6 del piano si sdoppia: `qa.py` può procedere, `opzioni.py` resta in attesa.
+- **Contatti aziendali** → **vale il set del monorepo**: `Tel +39 02.50020918`, `camperioSIM@camperiosim.com`. Nessuna modifica al monorepo; da bonificare dove il set vecchio sopravvive fuori dal programma (copia locale, 16 `build_*.py` di Earnings Review).
+- **Variazioni di prezzo** → **euro come dato principale, cambio incluso**, con la variazione in valuta del titolo in una **colonna a fianco** (l'effetto cambio si legge per differenza). Medie e ordinamento restano sull'euro. Vedi voce 8.
+- **Loghi** → regola fissa dell'autore: **sui Word si usa il JPG a fondo bianco**, il PNG trasparente rende male. Vedi voce 10. **Resta aperto** quale dei due SVG sia quello ufficiale: riguarda solo la pagina web, non i Word.
 
 ---
 
@@ -286,7 +293,9 @@ Prima del punto 5 va **ripristinato e verificato il fail-safe Oracle**, altrimen
 
 ### Fase 3 — Nuove funzionalità
 
-`opzioni.py`, `qa.py`, template e CSS, adattati alle convenzioni del monorepo: import da `camperio_core` invece delle copie locali, `html.escape()` sugli output, rotte dietro lo stesso controllo di identità delle altre. `diagnostica_hedge.py` in `tools/`. Decisione su `reports.py` dopo il chiarimento.
+`opzioni.py`, `qa.py`, template e CSS, adattati alle convenzioni del monorepo: import da `camperio_core` invece delle copie locali, `html.escape()` sugli output, rotte dietro lo stesso controllo di identità delle altre. `diagnostica_hedge.py` in `tools/`.
+
+Dopo le risposte del 16/09 la fase si sdoppia: **`qa.py` procede** (nessuna dipendenza esterna, nessuna rete), **`opzioni.py` resta in attesa** del canale dati verso la postazione Bloomberg — la licenza è nominativa e non è replicabile sul server, quindi il modulo non può montare `blpapi` lato server. Nel frattempo, se lo si porta, deve girare sui dati salvati **dichiarandolo nel report**. `reports.py` esce dal piano (decisione dell'autore).
 
 ### Fase 4 — Chiusura del fork
 

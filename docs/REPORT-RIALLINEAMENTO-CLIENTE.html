@@ -1,5 +1,5 @@
 <title>Riallineamento App Comitato</title>
-<meta name="description" content="Report del riallineamento tra la versione locale dell'app Comitato e quella in produzione, con le domande aperte per il cliente.">
+<meta name="description" content="Report del riallineamento tra la versione locale dell'app Comitato e quella in produzione, con le sei domande al cliente e le risposte ricevute il 16/09/2026.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
   :root {
@@ -58,6 +58,9 @@
   .q .why { color: var(--ink-2); font-size: 15px; }
   .q .ask { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--rule); }
   .q .ask b { color: var(--arancio-ink); }
+  .q .ans { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--rule); }
+  .q .ans b:first-child { color: var(--ok); }
+  .q .eff { margin-top: 8px; color: var(--ink-2); font-size: 15px; }
   .tag { display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border: 1px solid var(--rule); color: var(--ink-2); margin-left: 8px; vertical-align: middle; }
   .tag.urg { border-color: var(--arancio); color: var(--arancio-ink); }
   .deadline { background: var(--warn-bg); border: 1px solid var(--arancio); padding: 14px 18px; margin: 0 0 18px; }
@@ -73,10 +76,11 @@
 <header>
   <p class="eyebrow">Camperio SIM · Comitato Investimenti · App di analisi portafoglio</p>
   <h1>Riallineamento dell'app Comitato: cosa abbiamo fatto e cosa ci serve da te</h1>
-  <p class="lede">La versione che hai sviluppato in locale e quella che gira sui server aziendali erano diventate due programmi diversi. Abbiamo riportato nel programma ufficiale le tue correzioni di metodo, tenendo le protezioni già in produzione. Restano sei domande a cui solo tu puoi rispondere.</p>
+  <p class="lede">La versione che hai sviluppato in locale e quella che gira sui server aziendali erano diventate due programmi diversi. Abbiamo riportato nel programma ufficiale le tue correzioni di metodo, tenendo le protezioni già in produzione. Le sei domande che restavano hanno ora la tua risposta: sono riportate qui sotto, ognuna con l'effetto sul piano di lavoro.</p>
   <div class="meta">
     <span>Data <b>13 settembre 2026</b></span>
     <span>Riferimento <b>pacchetto «Analisi portafoglio per comitato» del 12/09</b></span>
+    <span>Risposte dell'autore <b>16 settembre 2026</b></span>
     <span>Stato <b>pronto per la verifica insieme</b></span>
   </div>
 </header>
@@ -117,59 +121,79 @@
   <tr><td>Se il gestionale non risponde, il report viene prodotto lo stesso con l'ultima copia salvata, senza avviso</td><td>Il report si ferma e mostra un errore chiaro</td><td class="kept">tenuta la produzione</td></tr>
   <tr><td>Nessun controllo che la matrice valutaria quadri con il patrimonio prima di emettere il report</td><td>Se i numeri non tornano il report viene bloccato</td><td class="kept">tenuta la produzione</td></tr>
   <tr><td>Accesso senza login aziendale, aperto a tutta la rete</td><td>Login Microsoft, accesso solo agli utenti autorizzati</td><td class="kept">tenuta la produzione</td></tr>
-  <tr><td>Piè di pagina del PDF con i contatti vecchi (tel. 02 30322100, dominio camperio.net), riga tagliata a metà parola e numero di pagina coperto</td><td>Contatti aggiornati a settembre (02.50020918, camperiosim.com), impaginazione corretta</td><td class="kept">tenuta la produzione, <span class="no">da confermare i contatti</span></td></tr>
-  <tr><td>Variazioni di prezzo mostrate nella valuta del titolo invece che in euro</td><td>In euro, cambio incluso</td><td class="no">sospesa, è un cambio di metodo visibile al comitato</td></tr>
-  <tr><td>Analisi opzioni e «Chiedi al portafoglio»</td><td>Non presenti</td><td class="no">rinviate, dipendono dalle risposte sotto</td></tr>
+  <tr><td>Piè di pagina del PDF con i contatti vecchi (tel. 02 30322100, dominio camperio.net), riga tagliata a metà parola e numero di pagina coperto</td><td>Contatti aggiornati a settembre (02.50020918, camperiosim.com), impaginazione corretta</td><td class="kept">tenuta la produzione: contatti confermati il 16/09</td></tr>
+  <tr><td>Variazioni di prezzo mostrate nella valuta del titolo invece che in euro</td><td>In euro, cambio incluso</td><td class="kept">tenuta la produzione: l'euro resta il dato principale, la valuta del titolo si aggiunge in una colonna a fianco</td></tr>
+  <tr><td>Analisi opzioni e «Chiedi al portafoglio»</td><td>Non presenti</td><td class="no">rinviate: sui server manca Bloomberg, serve prima il canale dati (vedi risposta 3)</td></tr>
 </table>
 </div>
 
-<h2>Le domande per te</h2>
-<p>Sono le sei cose che non possiamo decidere al posto tuo. Bastano risposte brevi.</p>
+<h2>Le domande per te, e le tue risposte</h2>
+<p>Sono le sei cose che non potevamo decidere al posto tuo. Sotto ogni domanda: la risposta ricevuta il 16 settembre 2026 e cosa ne consegue sul programma ufficiale.</p>
 
 <div class="q">
   <h3>1. Per ricostruire le quantità a una data passata: registro ordini o registro movimenti?</h3>
   <p class="why">Nella nota del 26 giugno avevi scritto di usare il registro <b>ordini</b>, perché quello dei movimenti mescola collaterale e trasferimenti che non riconciliano. Nella versione locale di settembre, però, il calcolo usa il registro <b>movimenti</b>, con un commento che definisce «inaffidabile» il metodo sugli ordini. Una delle due indicazioni è superata.</p>
   <p class="ask"><b>Ci serve:</b> quale dei due vale oggi, e se hai un caso in cui uno dei due dava il numero sbagliato.</p>
+  <p class="ans"><b>Risposta (16/09):</b> vale la versione di settembre, cioè il <b>registro movimenti</b>. Il metodo sugli ordini non regge sui conti con operatività in derivati o con rettifiche; il caso concreto arriva a parte. Prima di chiudere, però, va fatta una <b>quadratura su un paio di conti a una data passata con i due metodi a confronto</b>: se divergono si guarda su cosa.</p>
+  <p class="eff"><b>Cosa cambia:</b> il passaggio al registro movimenti è deciso ma subordinato alla quadratura. Prepariamo un confronto ordini contro movimenti a parità di data sui conti che ci indichi, con l'elenco delle righe che spiegano la differenza; il cambio entra nel programma ufficiale solo dopo. Nota: oggi il programma è misto anche nella tua versione (il report «Variazioni» usa ancora gli ordini per l'aggiustamento dei prezzi), e quel punto va allineato nello stesso passaggio.</p>
 </div>
 
 <div class="q">
   <h3>2. Il modulo «report pesi/valute/titoli» alternativo: serve ancora?</h3>
   <p class="why">Nel pacchetto c'è un secondo modulo completo che produce gli stessi report in HTML, Word ed Excel, ma non è collegato a nessun pulsante dell'applicazione. Sembra un rifacimento lasciato a metà, oppure un lavoro futuro.</p>
   <p class="ask"><b>Ci serve:</b> è superato, incompiuto, o qualcosa che vuoi finire? Se superato, lo archiviamo.</p>
+  <p class="ans"><b>Risposta (16/09):</b> è un rifacimento a metà che vuoi finire tu. Per ora <b>resta fuori dal programma ufficiale</b>.</p>
+  <p class="eff"><b>Cosa cambia:</b> il modulo non entra nel monorepo e non compare nel piano di back-port. Resta nel pacchetto archiviato fuori dal repository; quando lo avrai completato lo valutiamo come cosa nuova, non come allineamento.</p>
 </div>
 
 <div class="q">
   <h3>3. L'analisi opzioni si collega davvero a Bloomberg?</h3>
   <p class="why">Il modulo «Analisi opzioni» prova a leggere volatilità e skew da un collegamento Bloomberg che nel pacchetto non c'è. Senza, usa solo i dati di esempio salvati ad agosto. Sul tuo computer probabilmente funziona perché quel collegamento esiste lì.</p>
   <p class="ask"><b>Ci serve:</b> quel collegamento esiste? È un file tuo o una licenza aziendale? Sui server non c'è Bloomberg: il modulo deve girare sui dati salvati, oppure aspettare un accesso ai dati?</p>
+  <p class="ans"><b>Risposta (16/09):</b> il collegamento esiste solo sulla tua postazione ed è il <b>terminale Bloomberg con licenza nominativa</b>: non è replicabile su un server e non è condivisibile. Sui server il modulo deve girare con <b>API che prendono il dato dal tuo PC o dalla postazione Bloomberg</b>.</p>
+  <p class="eff"><b>Cosa cambia:</b> il modulo opzioni non può dipendere da Bloomberg installato sul server — sarebbe una violazione di licenza, oltre che tecnicamente impossibile. Serve un passaggio intermedio: la postazione Bloomberg espone (o pubblica su file) volatilità e skew, il server li legge da lì. Finché quel canale non esiste, il modulo resta sui dati salvati e lo dichiara nel report, invece di far credere che il dato sia aggiornato. È un progetto a sé, da mettere in fila dopo il back-port: va deciso con l'IT chi espone l'API, come si autentica e cosa succede quando la postazione è spenta.</p>
 </div>
 
 <div class="q">
   <h3>4. Quali sono i contatti giusti in calce ai report?</h3>
   <p class="why">A settembre in produzione sono stati corretti telefono, fax ed email nel piè di pagina (02.50020918, camperioSIM@camperiosim.com). La tua versione locale ha ancora quelli precedenti (02 30322100, camperioSIM@camperio.net), che compaiono anche in tutti i report post-earnings.</p>
   <p class="ask"><b>Ci serve:</b> conferma di quale set è quello corrente, così lo allineiamo ovunque una volta sola.</p>
+  <p class="ans"><b>Risposta (16/09):</b> il set giusto è <b>02.50020918 / camperioSIM@camperiosim.com</b>.</p>
+  <p class="eff"><b>Cosa cambia:</b> niente sul programma ufficiale, che già usa quel set: la riga «da confermare» decade e il set del pacchetto locale (02 30322100, camperio.net) è definitivamente superato. Resta da sistemare dove i contatti vecchi compaiono ancora fuori dal programma: la tua copia locale e i sedici script dei report post-earnings.</p>
 </div>
 
 <div class="q">
   <h3>5. Le variazioni di prezzo: in euro o nella valuta del titolo?</h3>
   <p class="why">La tua versione mostra nel report «Variazioni» il rendimento nella valuta del titolo (quindi senza l'effetto del cambio), la produzione lo mostra in euro. È una scelta di metodo che il comitato vede direttamente.</p>
   <p class="ask"><b>Ci serve:</b> quale delle due vuoi come dato principale; possiamo mostrare l'altra a fianco.</p>
+  <p class="ans"><b>Risposta (16/09):</b> <b>l'euro come dato principale, cambio incluso</b> — il cliente e il comitato ragionano in euro e tutto il resto del reporting è in euro. La variazione nella valuta del titolo va in una <b>colonna a fianco</b>, così l'effetto cambio si legge per differenza.</p>
+  <p class="eff"><b>Cosa cambia:</b> il dato principale resta quello della produzione, non si tocca. Si aggiunge la colonna «Var. % valuta» accanto a «Var. %» nei tre formati del report Variazioni (schermo, Word, Excel), con le medie e l'ordinamento che continuano a seguire l'euro. Per i titoli in euro le due colonne coincidono, come deve essere.</p>
 </div>
 
 <div class="q">
   <h3>6. I due loghi in formato vettoriale</h3>
   <p class="why">Nel pacchetto due file di logo differiscono da quelli in produzione solo nei colori interni (bianco contro blu e grigio). Vogliamo capire se è una modifica voluta.</p>
   <p class="ask"><b>Ci serve:</b> quale versione dei loghi è quella ufficiale.</p>
+  <p class="ans"><b>Risposta (16/09):</b> regola fissa: <b>sui Word si usa il JPG a fondo bianco</b>, perché il PNG trasparente rende male.</p>
+  <p class="eff"><b>Cosa cambia:</b> diventa una regola di redazione, non una scelta caso per caso: i documenti Word prodotti dal programma prendono il logo dal JPG a fondo bianco. Oggi l'intestazione dei Word monta il PNG bianco su fascia blu, quindi la modifica cambia l'aspetto dell'intestazione e va guardata su un documento vero prima di andare in produzione; ci serve inoltre il <b>file JPG ufficiale</b> dall'ufficio, perché nel programma non c'è (ricavarlo noi dal PNG vorrebbe dire re-inventare un asset di marchio). Resta invece senza risposta quale dei due SVG sia quello ufficiale: serve solo per la pagina web, non per i Word, e lo chiudiamo alla prossima occasione.</p>
 </div>
 
 <h2>Come e quando va in produzione</h2>
 <div class="deadline"><b>Entro giovedì 18 settembre:</b> la correzione della copertura deve essere sui server di produzione, altrimenti dal primo report successivo al rinnovo del contratto il rischio azionario risulterebbe sottostimato di circa sette punti percentuali, senza alcun segnale di errore.</div>
 <ol class="steps">
   <li><b>Prima la correzione della copertura</b>, da sola: installazione sul server di prova, confronto del report Titoli sul portafoglio 8097S con i numeri qui sopra, poi produzione.</li>
-  <li><b>Poi tutto il resto</b> (percentuali, iShares, report comitato ampliato) in un secondo passaggio, sempre prova e poi produzione, dopo le tue risposte alle domande 1, 4 e 5.</li>
-  <li><b>Analisi opzioni e «Chiedi al portafoglio»</b> in un terzo passaggio, dopo le risposte alle domande 2 e 3.</li>
+  <li><b>Poi tutto il resto</b> (percentuali, iShares, report comitato ampliato) in un secondo passaggio, sempre prova e poi produzione. Le risposte del 16/09 lo sbloccano: i contatti sono confermati (domanda 4) e la colonna in valuta si aggiunge senza cambiare il dato principale (domanda 5). Il registro movimenti (domanda 1) viaggia <b>a parte</b>, dopo la quadratura sui due conti.</li>
+  <li><b>«Chiedi al portafoglio»</b> in un terzo passaggio: non dipende da Bloomberg, quindi può procedere. L'<b>analisi opzioni</b> invece resta in attesa del canale dati verso la postazione Bloomberg (domanda 3); intanto, se serve, gira sui dati salvati dichiarandolo nel report. Il modulo «report pesi/valute/titoli» esce dal piano (domanda 2).</li>
 </ol>
 <p>Per la verifica insieme ci bastano trenta minuti davanti al server di prova: report Titoli su 8097S, report cliente su R1450 al 22 luglio, report comitato su 8097S con le sezioni nuove.</p>
+
+<h2>Cosa serve da te adesso</h2>
+<p>Tre cose sole, tutte piccole:</p>
+<ol class="steps">
+  <li><b>Il caso sugli ordini</b> che avevi in mente, e <b>due conti con una data passata</b> su cui fare la quadratura ordini contro movimenti. Senza quelli il passaggio al registro movimenti resta fermo.</li>
+  <li><b>Il file JPG del logo a fondo bianco</b>, quello ufficiale dell'ufficio, da usare nei Word.</li>
+  <li><b>Trenta minuti davanti al server di prova</b> per la verifica insieme.</li>
+</ol>
 
 <h2>Cosa ti chiediamo per il futuro</h2>
 <ul>
@@ -178,5 +202,5 @@
   <li><b>Le analisi post-earnings e gli script di calcolo manuale</b> restano fuori dal programma: sono materiale di lavoro tuo, non hanno bisogno di stare sui server.</li>
 </ul>
 
-<footer>Preparato il 13 settembre 2026 sulla base del pacchetto ricevuto il 12 settembre e del programma in produzione al 9 settembre. Tutti i numeri citati sono verificabili sul server di prova.</footer>
+<footer>Preparato il 13 settembre 2026 sulla base del pacchetto ricevuto il 12 settembre e del programma in produzione al 9 settembre. Tutti i numeri citati sono verificabili sul server di prova. Aggiornato il 16 settembre 2026 con le risposte dell'autore alle sei domande.</footer>
 </div>

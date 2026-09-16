@@ -62,9 +62,13 @@ Nella nota del 26 giugno avevi scritto di usare il registro **ordini**, perché 
 
 **Ci serve:** quale dei due vale oggi, e se hai un caso in cui uno dei due dava il numero sbagliato.
 
-**Risposta (16/09):** vale la versione di settembre, cioè il **registro movimenti**. Il metodo sugli ordini non regge sui conti con operatività in derivati o con rettifiche; il caso concreto arriva a parte. Prima di chiudere, però, va fatta una **quadratura su un paio di conti a una data passata con i due metodi a confronto**: se divergono si guarda su cosa.
+**Risposta (16/09):** vale la versione di settembre, cioè il **registro movimenti**. Il motivo è che il registro movimenti intercetta anche i **trasferimenti** e le **operazioni sul capitale**, che il registro ordini — contenendo solo i trade — non vede: senza quelle righe la quantità ricostruita a una data passata è semplicemente sbagliata. Lo stesso vale per i conti con operatività in derivati o con rettifiche; il caso concreto arriva a parte. Prima di chiudere, una **quadratura su un paio di conti a una data passata con i due metodi a confronto**: se divergono si guarda su cosa.
 
-**Cosa cambia:** il passaggio al registro movimenti è deciso ma **subordinato alla quadratura**. Prepariamo un confronto ORD contro MOV a parità di data sui conti che ci indichi, con l'elenco delle righe che spiegano la differenza; il cambio entra nel programma ufficiale solo dopo. Nota: oggi il programma è misto anche nella tua versione (il report «Variazioni» usa ancora gli ordini per l'aggiustamento dei prezzi), e quel punto va allineato nello stesso passaggio.
+**Cosa cambia:** il passaggio al registro movimenti è deciso ma **subordinato alla quadratura**, e la quadratura cambia natura: non serve a scegliere il vincitore — quello è deciso — ma a **classificare le differenze**. Per ogni divergenza fra i due metodi ci aspettiamo di trovarla spiegata da un trasferimento o da un'operazione sul capitale, e in quel caso i movimenti hanno ragione e gli ordini sbagliavano in silenzio.
+
+Il rischio da presidiare è l'altro, quello che la nota di giugno segnalava: i movimenti contengono anche righe **tecniche** (collaterale, giroconti fra depositi) che non spostano la quantità posseduta e non devono essere contate due volte. Perciò il back-port non prende il registro movimenti così com'è: prende i movimenti **filtrati per causale**, e l'elenco delle causali da tenere lo ricaviamo proprio dai due conti della quadratura, dove le vediamo tutte con nome e numeri.
+
+Nota: oggi il programma è misto anche nella tua versione (il report «Variazioni» usa ancora gli ordini per l'aggiustamento dei prezzi), e quel punto va allineato nello stesso passaggio.
 
 ### 2. Il modulo «report pesi/valute/titoli» alternativo: serve ancora?
 

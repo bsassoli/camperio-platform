@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitoraggio Promotori — Camperio SIM</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<style>
+  :root{ color-scheme: light;
+    --blu:#1F3864; --blu2:#2E5395; --grigio:#F4F6FA; --bordo:#D9E1F2;
+    --testo:#1B1B1B; --verde:#1E7B34; --rosso:#B00020;
+    --arancio:#E07B1E; --arancio-scuro:#B85E12; --arancio-chiaro:#FCE7D2;
+  }
+  *{box-sizing:border-box;}
+  [hidden]{display:none!important;}
+  body{font-family:Arial,Helvetica,sans-serif;background:var(--grigio);color:var(--testo);margin:0;padding:0 0 60px 0;}
+  header{background:var(--blu);color:#fff;padding:22px 34px;border-bottom:4px solid var(--arancio);}
+  header h1{margin:0;font-size:22px;}
+  header p{margin:6px 0 0;font-size:12.5px;color:#C9D4EC;}
+  .banner{background:#FFF3CD;color:#7A5B00;text-align:center;font-size:12px;padding:5px;font-weight:bold;letter-spacing:.5px;}
+  .banner.demo{background:#E4EBF7;color:var(--blu);}
+  .container{max-width:1200px;margin:0 auto;padding:24px 20px;}
+  .controls{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--bordo);border-radius:10px;padding:14px 20px;margin-bottom:22px;flex-wrap:wrap;}
+  .controls label{font-weight:bold;font-size:14px;color:var(--blu);}
+  select{font-size:15px;padding:7px 10px;border-radius:6px;border:2px solid var(--blu2);background:#fff;font-weight:bold;color:var(--blu);max-width:100%;}
+  select#promSel{border-color:var(--arancio);color:var(--arancio-scuro);min-width:min(280px,100%);}
+  input[type=date]{font-size:14px;padding:6px 8px;border-radius:6px;border:2px solid var(--blu2);font-weight:bold;color:var(--blu);}
+  button{font-size:14px;padding:7px 14px;border-radius:6px;border:2px solid var(--arancio);background:var(--arancio);color:#fff;font-weight:bold;cursor:pointer;}
+  button:hover{background:var(--arancio-scuro);border-color:var(--arancio-scuro);}
+  button:disabled,select:disabled,input:disabled{opacity:.6;cursor:not-allowed;}
+  #periodoLabel{font-size:13px;font-weight:bold;color:var(--blu);background:#EAF0FB;padding:6px 12px;border-radius:6px;}
+  .note-anno{font-size:12px;color:#8a6d00;background:#FFF8E1;padding:6px 12px;border-radius:6px;display:inline-block;}
+  #status{font-size:13px;color:#5b6b8c;}
+  #errorBox{background:#FDECEA;border:1px solid #F5B5AE;color:#B00020;padding:12px 16px;border-radius:8px;margin-bottom:18px;font-size:13px;}
+  #avvisiNomi{background:#FFF8E1;border:1px solid #F0D48A;color:#6B5000;padding:10px 16px;border-radius:8px;margin-bottom:18px;font-size:13px;}
+  #avvisiNomi ul{margin:6px 0 0;padding-left:18px;}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:24px;}
+  .kpi{background:#fff;border:1px solid var(--bordo);border-radius:10px;padding:16px 18px;border-top:3px solid var(--blu2);}
+  .kpi.accento{border-top:3px solid var(--arancio);}
+  .kpi .lbl{font-size:12px;color:#5b6b8c;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
+  .kpi .val{font-size:22px;font-weight:bold;color:var(--blu);}
+  .kpi.accento .val{color:var(--arancio-scuro);}
+  .kpi .sub{font-size:11.5px;color:#8892a6;margin-top:4px;}
+  .kpi.aperti{border-top-color:#2E7D32;} .kpi.aperti .val{color:#2E7D32;}
+  .kpi.chiusi{border-top-color:#B3261E;} .kpi.chiusi .val{color:#B3261E;}
+  .kpi.fondi{border-top-color:#6E4FA3;} .kpi.fondi .val{color:#563E82;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px;}
+  @media (max-width:820px){.grid2{grid-template-columns:1fr;}}
+  .card{background:#fff;border:1px solid var(--bordo);border-radius:10px;padding:18px 20px;}
+  .card h3{margin:0 0 12px;color:var(--blu);font-size:15px;border-bottom:2px solid var(--arancio-chiaro);padding-bottom:8px;}
+  .spazio{margin-bottom:22px;}
+  .tbl-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{background:var(--blu);color:#fff;text-align:left;padding:8px 9px;font-size:11.5px;}
+  td{padding:6px 9px;border-bottom:1px solid #eef1f7;}
+  tr:hover td{background:#FCF3E9;}
+  tr.totale td{font-weight:bold;}
+  .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .chiuso{color:var(--rosso);font-weight:bold;}
+  .aperto{color:var(--verde);}
+  .chartwrap{position:relative;height:260px;}
+  .note-grafici{font-size:12.5px;color:#6B5000;background:#FFF8E1;padding:8px 12px;border-radius:6px;margin-bottom:18px;}
+  .composizione{margin-bottom:22px;}
+  .composizione h3{margin:0 0 16px;font-size:16px;padding-bottom:9px;}
+  .barra-stack{display:flex;width:100%;height:34px;border-radius:8px;overflow:hidden;box-shadow:inset 0 0 0 1px var(--bordo);margin-bottom:20px;}
+  .barra-stack .seg{display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:bold;white-space:nowrap;overflow:hidden;transition:width .3s;}
+  .seg-rto{background:var(--blu2);}
+  .seg-consulenza{background:var(--arancio);}
+  .seg-gestione{background:#3E9B6E;}
+  .comp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .comp-grid.cinque{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));}
+  @media (max-width:760px){.comp-grid{grid-template-columns:1fr;}}
+  .comp-card{background:var(--grigio);border-radius:10px;padding:16px 18px;border-left:6px solid var(--blu2);}
+  .comp-card.consulenza{border-left-color:var(--arancio);}
+  .comp-card.gestione{border-left-color:#3E9B6E;}
+  .comp-card .comp-lbl{font-size:13px;font-weight:bold;color:#5b6b8c;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
+  .comp-card .comp-val{font-size:26px;font-weight:bold;color:var(--blu);}
+  .comp-card.consulenza .comp-val{color:var(--arancio-scuro);}
+  .comp-card.gestione .comp-val{color:#237A4E;}
+  .comp-card .comp-pct{font-size:15px;font-weight:bold;color:#8892a6;margin-left:6px;}
+  .comp-card .comp-n{font-size:12px;color:#8892a6;margin-top:6px;}
+  .comp-card.fondo{border-left-color:#6E4FA3;}
+  .comp-card.fondo .comp-val{color:#563E82;font-size:22px;}
+  .tipo-table td.pct{font-weight:bold;color:var(--arancio-scuro);}
+  .sub{font-size:12.5px;color:#4a5468;}
+  .note-metodo{font-size:12.5px;color:#4a5468;line-height:1.6;margin:0;padding-left:18px;}
+  footer{max-width:1200px;margin:30px auto 0;padding:14px 20px;font-size:11px;color:#8892a6;border-top:1px solid var(--bordo);}
+</style>
+</head>
+<body>
+{% if mode == 'LIVE' %}
+<div class="banner">USO INTERNO — CAMPERIO SIM — DATI LIVE DA ORACLE</div>
+{% else %}
+<div class="banner demo">MODALITÀ DEMO — DATI SINTETICI, DA NON CONFRONTARE CON QUELLI VERI</div>
+{% endif %}
+<header>
+  <h1>Monitoraggio Promotori — Camperio SIM</h1>
+  <p>Attribuzione contratti tramite Referente Commerciale (ANTALOC.TAGS_VALUE) · Dati interrogati dal DB Oracle in sola lettura · Documento riservato Direzione Generale</p>
+  {% if utente %}<p>Utente: <b>{{ utente }}</b></p>{% endif %}
+</header>
+<div class="container">
+
+  <div class="controls">
+    <label for="promSel">Referente commerciale:</label>
+    <select id="promSel" disabled><option>Caricamento elenco…</option></select>
+    <label for="annoSel">Anno di riferimento:</label>
+    <select id="annoSel" disabled></select>
+    <span id="periodoLabel" hidden></span>
+    <label for="dalCustom">Dal:</label>
+    <input type="date" id="dalCustom" disabled>
+    <label for="alCustom">Al:</label>
+    <input type="date" id="alCustom" disabled>
+    <span class="note-anno" id="noteAnno" hidden>Dato parziale (year-to-date), non confrontabile 1:1 con anni pieni.</span>
+    <button id="btnReload" type="button" disabled>↻ Ricarica</button>
+    <span id="status" role="status">Caricamento elenco referenti…</span>
+  </div>
+
+  <div id="errorBox" role="alert" hidden></div>
+  <div id="avvisiNomi" hidden></div>
+
+  <div id="app" hidden>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="lbl" id="kpiMassaLabel">Massa totale a fine periodo</div><div class="val" id="kpiMassa">-</div></div>
+      <div class="kpi accento"><div class="lbl">Flusso netto apporti/prelievi nel periodo</div><div class="val" id="kpiFlusso">-</div><div class="sub">movimenti reali VBG/VBI/PBG/PBI (incl. giro conti)</div></div>
+      <div class="kpi"><div class="lbl">Commissioni totali anno</div><div class="val" id="kpiComm">-</div></div>
+      <div class="kpi accento"><div class="lbl">Rendimento commissionale % su massa</div><div class="val" id="kpiYield">-</div><div class="sub">commissioni anno / massa fine periodo (approssimato)</div></div>
+      <div class="kpi"><div class="lbl">Contratti attivi (al Al)</div><div class="val" id="kpiNContratti">-</div><div class="sub" id="kpiNContrattiSub"></div></div>
+      <div class="kpi aperti"><div class="lbl" id="kpiApertiLabel">Contratti aperti nel periodo</div><div class="val" id="kpiAperti">-</div></div>
+      <div class="kpi chiusi"><div class="lbl" id="kpiChiusiLabel">Contratti chiusi nel periodo</div><div class="val" id="kpiChiusi">-</div></div>
+      <div class="kpi fondi"><div class="lbl">Fondi Controlfida in portafoglio</div><div class="val" id="kpiFondi">-</div><div class="sub" id="kpiFondiSub"></div></div>
+    </div>
+
+    <div class="card composizione">
+      <h3>Composizione masse per servizio</h3>
+      <div class="barra-stack" id="barraMasse"></div>
+      <div class="comp-grid" id="grigliaMasse"></div>
+    </div>
+
+    <div class="card composizione">
+      <h3>Composizione commissioni per servizio — anno selezionato</h3>
+      <div class="barra-stack" id="barraComm"></div>
+      <div class="comp-grid" id="grigliaComm"></div>
+    </div>
+
+    <div class="card composizione">
+      <h3>Fondi Controlfida in portafoglio (masse alla data Al)</h3>
+      <div class="comp-grid cinque" id="grigliaFamiglie"></div>
+      <div class="sub" style="margin-top:10px;">Totale investito nei fondi Controlfida: <b id="fondoTotVal">-</b> (<span id="fondoTotPct"></span> della massa totale) — perimetro definito da WCTDD.SOCEMI='CON' (codice emittente ufficiale, non il nome del fondo). Fotografia storica alla data "Al" selezionata sopra (non necessariamente oggi).</div>
+      <div class="sub" style="margin-top:6px;">Per confronto, AUM in <u>tutti</u> i fondi/OICR in portafoglio (non solo Controlfida, flag WCTDD.FONDI='S' — stesso criterio di eventuali estrazioni interne "AUM FONDI"): <b id="fondoTuttiVal">-</b> su <span id="fondoTuttiN"></span> — anche questo dato segue la data "Al" selezionata.</div>
+      {% if mode != 'LIVE' %}<div class="sub" style="margin-top:6px;"><i>In DEMO i fondi sono una fotografia fissa: non cambiano con la data Al.</i></div>{% endif %}
+
+      <h3 style="margin-top:22px;">Spaccato per servizio del totale investito nei fondi Controlfida</h3>
+      <div class="barra-stack" id="barraFondi"></div>
+      <div class="comp-grid" id="grigliaFondi"></div>
+    </div>
+
+    <div class="note-grafici" id="graficiAssenti" hidden></div>
+    <div class="grid2" id="grafici">
+      <div class="card"><h3>Commissioni per trimestre (EUR)</h3><div class="chartwrap"><canvas id="chartTrim" aria-label="Commissioni per trimestre"></canvas></div></div>
+      <div class="card"><h3>Commissioni per tipologia (EUR)</h3><div class="chartwrap"><canvas id="chartTipo" aria-label="Commissioni per tipologia"></canvas></div></div>
+    </div>
+
+    <div class="card spazio">
+      <h3>Rendimento commissionale per tipologia (% sulla massa totale — anno selezionato)</h3>
+      <div class="tbl-wrap">
+        <table id="tblTipoPct" class="tipo-table">
+          <thead><tr><th>Tipologia commissione</th><th class="num">Importo (EUR)</th><th class="num">% su massa totale</th><th class="num">% su commissioni totali</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card spazio">
+      <h3>Dettaglio contratti — periodo selezionato</h3>
+      <div class="sub" style="margin-bottom:8px;">Esclusi i contratti chiusi prima dell'inizio del periodo (Dal); restano visibili quelli attivi e quelli chiusi dentro il periodo.</div>
+      <div class="tbl-wrap">
+        <table id="tblContratti">
+          <thead>
+            <tr><th>Ambito</th><th>Contratto</th><th>Intestatario</th><th>Linea</th><th>Data apertura</th><th>Stato</th>
+                <th class="num">Massa (EUR)</th><th>Aggiornato al</th><th class="num">Saldo apporti/prelievi (EUR)</th>
+                <th class="num">Rendimento lordo periodo (EUR e %)</th><th class="num">Commissioni anno (EUR)</th>
+                <th class="num">N. operazioni compravendita</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Note metodologiche</h3>
+      <ul class="note-metodo">
+        <li>Contratti attribuiti al referente commerciale tramite tag ufficiale (ANTALOC.TAGS_VALUE, NN_TGT=1019) — non tramite il solo codice operatore CNT.CODOPE, che in alcuni casi può differire dal referente reale.</li>
+        <li>Masse = SRE.CONSFIN a fine anno (31/12) o all'ultimo periodo disponibile per l'anno corrente. Storico limitato agli ultimi 5 anni (anno corrente incluso); il selettore "Anno di riferimento" mostra quindi al massimo gli ultimi 5 anni.</li>
+        <li>Periodo di default: "Dal" = 1° gennaio dell'anno di riferimento; "Al" = 31/12 per gli anni chiusi, oppure — per l'anno in corso — la data più recente tra gli "aggiornato al" dei singoli contratti, cioè il dato più fresco effettivamente mostrato. La colonna "Aggiornato al" riporta la data della massa di ciascun contratto: per l'anno corrente può differire da un contratto all'altro perché le rivalutazioni GPM/gestione sono processate a lotti in giorni diversi per portafoglio.</li>
+        <li>I campi "Dal" e "Al" sono modificabili: scegliendo date diverse (es. Dal 01/04 Al 30/06 per isolare il secondo trimestre) il cruscotto ricalcola massa, saldo apporti/prelievi e rendimento prendendo per ciascun contratto lo snapshot SRE più recente disponibile a quella data. Commissioni e numero di operazioni restano calcolati sull'intero anno di riferimento.</li>
+        <li>Fondi Controlfida: il perimetro è dato dal codice emittente ufficiale <b>WCTDD.SOCEMI='CON'</b>, non da un match sul nome del fondo. Le famiglie DELTA/Delta Defensive/Superdiscovery/Alpha Green sono solo un'etichettatura sul nome; tutto ciò che ha SOCEMI='CON' ma non rientra nelle 4 famiglie confluisce in "Altri fondi Controlfida". Nelle card per famiglia il numero conta le posizioni in portafoglio.</li>
+        <li>Fondi Controlfida — fotografia storica: le tabelle base ANTALOCGEST.WCTDD/ANTALOCN.WCTDD conservano uno storico giornaliero per titolo (DTUNIMER); per ciascun titolo si prende l'ultima valorizzazione non successiva alla data "Al" (entro 20 giorni), escludendo i contratti già chiusi prima di "Al". Anche la riga "AUM in tutti i fondi/OICR" (flag FONDI='S') segue la stessa logica.</li>
+        <li>Tre contatori contrattuali riferiti al periodo Dal-Al: <b>"Contratti attivi"</b> = in essere alla data "Al"; <b>"Contratti aperti"</b> = data di apertura nel periodo; <b>"Contratti chiusi"</b> = data di chiusura nel periodo. Un contratto aperto e chiuso nello stesso periodo compare in entrambi i conteggi.</li>
+        <li>Commissioni = MOV.CTVCNO nette (storni, ONE, RSP esclusi). Categorie: Gestione=CDG, Consulenza=CCO, Servizio=CSA, Intermediazione/negoziazione=AV*, Exx (derivati a 2 cifre), FUx, OPF, OCF, Tenuta conto=CTC, Altri=resto.</li>
+        <li>Flusso netto apporti/prelievi — due misure diverse: il <b>KPI in alto</b> somma i movimenti reali MOV (versamenti VBG/VBI, prelievi PBG/PBI, trasferimenti titoli GCT) con data valuta nel periodo Dal-Al; la <b>colonna "Saldo" del dettaglio</b> è la variazione dei cumulati SRE (APPORTI+PRELIEVI) rispetto a "Dal" o al fine anno precedente, che include anche addebiti automatici (commissioni, bolli).</li>
+        <li>Rendimento lordo (EUR e %) nel dettaglio = calcolato dai cumulati SRE per il periodo Dal-Al: EUR = variazione di massa (CONSFIN) al netto del saldo apporti/prelievi SRE; % = rapporto tra gli indici TCLI di inizio e fine periodo. "n.d." se il contratto non ha uno snapshot SRE di partenza (es. aperto dopo "Dal").</li>
+        <li>L'anno corrente è parziale (YTD): i confronti con anni pieni vanno letti con cautela.</li>
+        <li>N. operazioni compravendita = movimenti di negoziazione effettivamente eseguiti (ANTASIMN.MOV, non ORD) su titoli/fondi (AV%), derivati (Exx a due cifre) e OPF/OCF. Escluse le voci tecniche e gli storni. Non disponibile per i conti in Gestione patrimoniale (n/d).</li>
+        <li>I dati che non dipendono dalle date (contratti, masse di fine anno, commissioni, operazioni) restano in memoria per 5 minuti; "Ricarica" li rilegge subito da Oracle.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+<footer>Camperio SIM S.p.A. — Query eseguite sul DB Oracle Camperio in sola lettura. Uso interno, non destinato alla clientela. Build {{ build }}.</footer>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+let VISTA = null, REF = null, personalizzate = {}, richiesta = 0;
+let chartTrim = null, chartTipo = null;
+
+function esc(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// Separatore delle migliaia applicato a mano: alcuni browser senza dati ICU completi
+// ignorano il raggruppamento di toLocaleString('it-IT').
+function fmtNum(n, decimali){
+  if(n === null || n === undefined || isNaN(n)) return 'n.d.';
+  const [intera, dec] = Math.abs(n).toFixed(decimali).split('.');
+  return (n < 0 ? '-' : '') + intera.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (dec ? ',' + dec : '');
+}
+const fmtInt = n => fmtNum(n, 0);
+const fmt = n => (n === null || n === undefined) ? 'n.d.' : fmtNum(n, 0) + ' €';
+const fmtPct = n => (n === null || n === undefined) ? 'n.d.' : fmtNum(n, 3) + ' %';
+const fmtQuota = n => fmtNum(n, 1) + '%';
+const fmtSigned = n => (n >= 0 ? '+' : '') + fmt(n);
+const fmtPctSigned = n => (n >= 0 ? '+' : '') + fmtNum(n, 2) + ' %';
+function fmtData(iso){
+  if(!iso) return 'n.d.';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+const oggiIso = () => new Date().toISOString().slice(0, 10);
+const ora = () => new Date().toTimeString().slice(0, 8);
+
+async function chiedi(percorso, params){
+  const qs = new URLSearchParams(params || {}).toString();
+  // percorso relativo: l'app funziona anche sotto un prefisso dietro nginx (/promotori/)
+  const r = await fetch('api/' + percorso + (qs ? '?' + qs : ''), {headers: {'Accept': 'application/json'}});
+  let dati = null;
+  try { dati = await r.json(); } catch(_) { /* risposta non JSON: es. sessione scaduta */ }
+  if(!r.ok || dati === null) throw new Error((dati && dati.errore) || `risposta del server non valida (HTTP ${r.status})`);
+  return dati;
+}
+
+function mostraErrore(testo){ $('errorBox').textContent = testo; $('errorBox').hidden = false; }
+function nascondiErrore(){ $('errorBox').hidden = true; }
+function bloccaControlli(si){
+  ['promSel', 'annoSel', 'dalCustom', 'alCustom', 'btnReload'].forEach(id => { $(id).disabled = si; });
+}
+function etichettaRef(ref){
+  const o = [...$('promSel').options].find(o => o.value === ref);
+  return o ? o.textContent : ref;
+}
+
+function mostraAvvisiNomi(nomi){
+  const box = $('avvisiNomi');
+  if(!nomi || !nomi.avvisi.length){ box.hidden = true; return; }
+  box.innerHTML = '<b>Nomi dei referenti</b><ul>' + nomi.avvisi.map(a => '<li>' + esc(a) + '</li>').join('') + '</ul>';
+  box.hidden = false;
+}
+
+async function init(){
+  try{
+    const d = await chiedi('referenti');
+    const sel = $('promSel');
+    sel.innerHTML = '';
+    d.referenti.forEach(r => {
+      const o = document.createElement('option');
+      o.value = r.codice; o.textContent = r.etichetta;
+      sel.appendChild(o);
+    });
+    mostraAvvisiNomi(d.nomi);
+    if(!d.referenti.length){ $('status').textContent = 'Nessun referente commerciale trovato.'; return; }
+    $('status').textContent = fmtInt(d.referenti.length) + ' referenti commerciali trovati.';
+    await carica(sel.value, {nuovo: true});
+  }catch(e){
+    $('status').textContent = '';
+    mostraErrore('Errore nel caricamento elenco referenti: ' + e.message);
+    $('promSel').disabled = false;
+  }
+}
+
+async function carica(ref, opzioni){
+  const {nuovo = false, rinfresca = false, anno = null, messaggio = null} = opzioni || {};
+  if(nuovo){ REF = ref; personalizzate = {}; $('app').hidden = true; }
+  const params = {ref};
+  if(anno !== null){
+    params.anno = anno;
+    const p = personalizzate[anno] || {};
+    if(p.dal) params.dal = p.dal;
+    if(p.al) params.al = p.al;
+  }
+  if(rinfresca) params.refresh = '1';
+  const mia = ++richiesta;
+  nascondiErrore();
+  bloccaControlli(true);
+  $('status').textContent = messaggio || ('Caricamento dati per ' + etichettaRef(ref) + '…');
+  try{
+    const v = await chiedi('cruscotto', params);
+    if(mia !== richiesta) return;
+    if(v.vuoto){ $('app').hidden = true; $('status').textContent = v.messaggio; return; }
+    VISTA = v;
+    render(v);
+    $('app').hidden = false;
+    $('status').textContent = etichettaRef(ref) + ': ' + fmtInt(v.kpi.contratti_storico) + ' contratti · aggiornato ' + ora();
+  }catch(e){
+    if(mia !== richiesta) return;
+    $('status').textContent = '';
+    mostraErrore('Errore nel caricamento dati: ' + e.message);
+  }finally{
+    if(mia === richiesta){
+      bloccaControlli(false);
+      if(!VISTA || $('app').hidden){ $('annoSel').disabled = true; $('dalCustom').disabled = true; $('alCustom').disabled = true; }
+    }
+  }
+}
+
+function composizione(idBarra, idGriglia, servizi){
+  $(idBarra).innerHTML = servizi.filter(s => s.quota > 0).map(s =>
+    `<div class="seg seg-${esc(s.chiave)}" style="width:${Number(s.quota)}%;">${s.quota >= 8 ? esc(s.etichetta) + ' ' + fmtNum(s.quota, 0) + '%' : ''}</div>`
+  ).join('');
+  $(idGriglia).innerHTML = servizi.map(s =>
+    `<div class="comp-card ${esc(s.chiave)}"><div class="comp-lbl">${esc(s.etichetta)}</div>` +
+    `<div><span class="comp-val">${fmt(s.valore)}</span><span class="comp-pct">${fmtQuota(s.quota)}</span></div>` +
+    `<div class="comp-n">${fmtInt(s.n)} contratti</div></div>`
+  ).join('');
+}
+
+function render(v){
+  const sel = $('annoSel');
+  sel.innerHTML = '';
+  v.anni.forEach((a, i) => {
+    const o = document.createElement('option');
+    o.value = a;
+    o.textContent = a + (i === v.anni.length - 1 ? ' (YTD)' : '');
+    o.selected = a === v.anno;
+    sel.appendChild(o);
+  });
+  $('noteAnno').hidden = !v.anno_in_corso;
+
+  const {dal, al} = v.periodo;
+  $('periodoLabel').textContent = `Periodo: dal ${fmtData(dal)} al ${fmtData(al)}`;
+  $('periodoLabel').hidden = false;
+  $('kpiMassaLabel').textContent = `Massa totale al ${fmtData(al)}`;
+  const dc = $('dalCustom'); dc.min = `${v.anno - 5}-01-01`; dc.max = al; dc.value = dal;
+  const ac = $('alCustom'); ac.min = dal; ac.max = oggiIso(); ac.value = al;
+
+  const k = v.kpi;
+  $('kpiMassa').textContent = fmt(k.massa);
+  $('kpiFlusso').textContent = fmt(k.flusso_reale);
+  $('kpiComm').textContent = fmt(k.commissioni);
+  $('kpiYield').textContent = fmtPct(k.rendimento_commissionale);
+  $('kpiNContratti').textContent = fmtInt(k.contratti_attivi);
+  $('kpiNContrattiSub').textContent = 'in essere al ' + fmtData(al) + ' · su ' + fmtInt(k.contratti_storico) + ' totali a storico';
+  $('kpiApertiLabel').textContent = 'Contratti aperti dal ' + fmtData(dal) + ' al ' + fmtData(al);
+  $('kpiAperti').textContent = fmtInt(k.contratti_aperti);
+  $('kpiChiusiLabel').textContent = 'Contratti chiusi dal ' + fmtData(dal) + ' al ' + fmtData(al);
+  $('kpiChiusi').textContent = fmtInt(k.contratti_chiusi);
+  $('kpiFondi').textContent = fmt(k.fondi);
+  $('kpiFondiSub').textContent = fmtQuota(k.fondi_quota_massa) + ' della massa totale';
+
+  composizione('barraMasse', 'grigliaMasse', v.masse);
+  composizione('barraComm', 'grigliaComm', v.commissioni.servizi);
+
+  const f = v.fondi;
+  $('grigliaFamiglie').innerHTML = f.famiglie.map(x =>
+    `<div class="comp-card fondo"><div class="comp-lbl">${esc(x.etichetta)}</div>` +
+    `<div><span class="comp-val">${fmt(x.valore)}</span><span class="comp-pct">${fmtQuota(x.quota_massa)}</span></div>` +
+    `<div class="comp-n">${fmtInt(x.n)} posizioni</div></div>`
+  ).join('');
+  $('fondoTotVal').textContent = fmt(f.totale);
+  $('fondoTotPct').textContent = fmtQuota(f.quota_massa);
+  $('fondoTuttiVal').textContent = fmt(f.tutti_oicr.valore);
+  $('fondoTuttiN').textContent = fmtInt(f.tutti_oicr.n) + ' contratti';
+  composizione('barraFondi', 'grigliaFondi', f.servizi);
+
+  grafici(v.commissioni);
+
+  const c = v.commissioni;
+  const righeTipo = c.per_tipo.map(t =>
+    `<tr><td>${esc(t.categoria)}</td><td class="num">${fmt(t.importo)}</td>` +
+    `<td class="num pct">${fmtPct(t.quota_massa)}</td><td class="num">${t.quota_commissioni === null ? 'n.d.' : fmtQuota(t.quota_commissioni)}</td></tr>`
+  );
+  righeTipo.push(`<tr class="totale"><td>Totale</td><td class="num">${fmt(c.totale)}</td>` +
+    `<td class="num pct">${fmtPct(c.totale_quota_massa)}</td><td class="num">100%</td></tr>`);
+  document.querySelector('#tblTipoPct tbody').innerHTML = righeTipo.join('');
+
+  document.querySelector('#tblContratti tbody').innerHTML = v.contratti.map(r => {
+    const rend = (r.rendimento_eur !== null && r.rendimento_pct !== null)
+      ? fmtSigned(r.rendimento_eur) + ' (' + fmtPctSigned(r.rendimento_pct) + ')' : 'n.d.';
+    const stato = r.chiusura ? 'Chiuso ' + fmtData(r.chiusura) : 'Aperto';
+    return `<tr><td>${esc(r.sotto_ambito)}</td><td>${esc(r.codice)}</td><td>${esc(r.intestatario)}</td>` +
+      `<td>${esc(r.linea)}</td><td>${r.apertura ? fmtData(r.apertura) : ''}</td>` +
+      `<td class="${r.chiusura ? 'chiuso' : 'aperto'}">${stato}</td>` +
+      `<td class="num">${fmt(r.massa)}</td><td>${fmtData(r.aggiornato_al)}</td>` +
+      `<td class="num">${r.saldo === null ? 'n.d.' : fmtSigned(r.saldo)}</td>` +
+      `<td class="num">${rend}</td><td class="num">${fmt(r.commissioni)}</td>` +
+      `<td class="num">${r.operazioni === null ? 'n/d (Gestione)' : fmtInt(r.operazioni)}</td></tr>`;
+  }).join('');
+}
+
+function grafici(c){
+  const trim = c.per_trimestre;
+  if(typeof Chart === 'undefined'){
+    // senza la libreria (CDN non raggiungibile) i numeri restano leggibili qui e in tabella
+    $('grafici').hidden = true;
+    $('graficiAssenti').hidden = false;
+    $('graficiAssenti').textContent = 'Grafici non disponibili: la libreria Chart.js non è raggiungibile. ' +
+      'Commissioni per trimestre — ' + trim.map((q, i) => 'Q' + (i + 1) + ' ' + fmt(q)).join(' · ') +
+      '. Il dettaglio per tipologia è nella tabella sotto.';
+    return;
+  }
+  if(chartTrim) chartTrim.destroy();
+  chartTrim = new Chart($('chartTrim'), {
+    type: 'bar',
+    data: {labels: ['Q1', 'Q2', 'Q3', 'Q4'], datasets: [{label: 'Commissioni (EUR)', data: trim, backgroundColor: '#E07B1E'}]},
+    options: {responsive: true, maintainAspectRatio: false,
+      plugins: {legend: {display: false}, tooltip: {callbacks: {label: x => fmt(x.parsed.y)}}},
+      scales: {y: {beginAtZero: true, ticks: {callback: x => fmtInt(x)}}}}
+  });
+  if(chartTipo) chartTipo.destroy();
+  chartTipo = new Chart($('chartTipo'), {
+    type: 'doughnut',
+    data: {labels: c.per_tipo.map(t => t.categoria),
+           datasets: [{data: c.per_tipo.map(t => t.importo),
+                       backgroundColor: ['#1F3864', '#E07B1E', '#2E5395', '#F2A65A', '#6E8FC7', '#B85E12', '#3E9B6E', '#8892a6']}]},
+    options: {responsive: true, maintainAspectRatio: false,
+      plugins: {legend: {position: 'bottom', labels: {boxWidth: 12, font: {size: 11}}},
+                tooltip: {callbacks: {label: x => x.label + ': ' + fmt(x.parsed)}}}}
+  });
+}
+
+function cambiaData(campo, e){
+  const valore = e.target.value;
+  if(!valore || !VISTA) return;
+  const anno = VISTA.anno;
+  (personalizzate[anno] = personalizzate[anno] || {})[campo] = valore;
+  const testo = campo === 'al'
+    ? 'Ricalcolo masse, fondi e flussi al ' + fmtData(valore) + '…'
+    : 'Ricalcolo flussi e rendimento dal ' + fmtData(valore) + '…';
+  carica(REF, {anno, messaggio: testo});
+}
+
+$('promSel').addEventListener('change', e => carica(e.target.value, {nuovo: true}));
+$('annoSel').addEventListener('change', e => carica(REF, {anno: parseInt(e.target.value, 10), messaggio: 'Caricamento anno ' + e.target.value + '…'}));
+$('alCustom').addEventListener('change', e => cambiaData('al', e));
+$('dalCustom').addEventListener('change', e => cambiaData('dal', e));
+$('btnReload').addEventListener('click', () => carica(REF, {nuovo: true, rinfresca: true}));
+init();
+</script>
+</body>
+</html>

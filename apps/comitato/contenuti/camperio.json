@@ -1,0 +1,56 @@
+{
+ "_nota": "Testi editoriali della Linea Camperio usati da Sintesi Cliente e Rendiconto. Si modificano qui, senza toccare il codice: i numeri e i pesi restano calcolati da Oracle. Il file si chiama come la linea in minuscolo (SRE/CNT.TIPOGE -> LINEA in data_layer.py); se manca si usa default.json.",
+
+ "reparti": {
+  "Difesa": "Regge quando i mercati scendono. Titoli di Stato e sovranazionali a scadenza breve, oro fisico e liquidità. Non è la parte che fa il rendimento: è la parte che permette di restare investiti nella parte che lo fa, senza dover vendere nel momento sbagliato.",
+  "Centro Campo": "Partecipa ai rialzi limitando l'ampiezza delle discese. Comparti UCITS costruiti con strumenti opzionari e gestiti in modo sistematico: entrano nei mercati con un profilo asimmetrico, che rinuncia a una parte del guadagno per contenere la perdita.",
+  "Attacco": "Cerca la crescita. Azioni scelte una per una, con un peso massimo dell'1,5% ciascuna, più alcuni ETF su indici che non si replicano bene con i singoli titoli. Nessuna posizione è abbastanza grande da poter fare male al portafoglio.",
+  "Overlay": "Le coperture. Future e opzioni usati per ridurre l'esposizione complessiva quando riteniamo che il mercato sia caro, senza vendere i titoli in portafoglio.",
+  "Altro": "Ratei di interesse e altre partite."
+ },
+
+ "perche": [
+  "In queste pagine non trovi l'elenco di tre o quattro fondi. Sono strumenti detenuti direttamente, uno per uno, con quantità, prezzo, controvalore e peso. Dietro ogni riga c'è una nostra decisione, e per ognuna sappiamo dirti perché è lì.",
+  "È la differenza fra comprare il mercato e sceglierlo. Un portafoglio costruito con i fondi si spiega in una riga e si governa poco: le scelte le fa qualcun altro, i costi si sommano uno sopra l'altro e si esce quando lo decide il fondo. Un portafoglio costruito con i titoli si spiega titolo per titolo, si liquida in pochi giorni e non nasconde nulla."
+ ],
+
+ "insieme": [
+  "Il criterio non è quanto rende ciascuna parte, ma che cosa fa quando le altre non funzionano. La difesa è liquidabile in pochi giorni e quasi tutta a scadenza breve: è la riserva che ci consente di comprare mentre gli altri vendono, e l'oro è la parte che sale esattamente quando scende tutto il resto. Il centrocampo non cerca di indovinare la direzione dei mercati: compra un profilo, partecipando ai rialzi con una parte dell'esposizione e limitando le discese per costruzione. L'attacco è l'unica parte che può perdere molto, e per questo è la più frazionata."
+ ],
+
+ "convinzioni_premessa": "Il tema di fondo non è scommettere su quale applicazione dell'intelligenza artificiale vincerà. È comprare chi vende gli strumenti a tutti quelli che ci stanno provando: chi fa le memorie, chi fa le macchine per produrre i chip, chi costruisce le reti e chi fornisce l'energia. Accanto, due blocchi che dipendono poco dal ciclo economico — la salute e la difesa europea — e una parte che serve solo a proteggere.",
+
+ "convinzioni": [
+  {"titolo": "Alphabet (Google)", "match": ["ALPHABET"],
+   "perche": "La grande azienda più sottovalutata dell'intelligenza artificiale: ha tutti gli ingredienti e scambia a multipli inferiori ai concorrenti."},
+  {"titolo": "Micron Technology", "match": ["MICRON"],
+   "perche": "Ogni acceleratore per l'intelligenza artificiale monta memorie HBM. Micron è uno dei tre produttori al mondo che sa farle."},
+  {"titolo": "NVIDIA", "match": ["NVIDIA"],
+   "perche": "Senza NVIDIA l'intelligenza artificiale non sarebbe quella che è. La teniamo, ma con peso contenuto: vogliamo il tema, non il suo prezzo."},
+  {"titolo": "Samsung Electronics", "match": ["SAMSUNG"],
+   "perche": "Le stesse memorie di Micron, comprate in Asia a multipli più bassi."},
+  {"titolo": "Applied Materials", "match": ["APPLIED MATERIALS"],
+   "perche": "Vende i picconi all'industria dei chip. Durante una corsa all'oro, vendere i picconi è il mestiere migliore."},
+  {"titolo": "ASML Holding", "match": ["ASML"],
+   "perche": "L'unica azienda al mondo che costruisce le macchine per produrre i chip di ultima generazione."},
+  {"titolo": "Infineon Technologies", "match": ["INFINEON"],
+   "perche": "Ogni auto elettrica monta fra i cinquanta e gli ottanta chip Infineon: è il modo europeo di partecipare alla transizione."},
+  {"titolo": "Automazione, reti ed energia", "match": ["SIEMENS", "SCHNEIDER", "PRYSMIAN"],
+   "perche": "L'intelligenza artificiale consuma energia. Chi costruisce automazione, reti e cavi la vende a tutti, senza dover indovinare il vincitore."},
+  {"titolo": "Difesa europea", "match": ["BAE", "THALES", "AIRBUS", "LEONARDO", "RHEINMETALL"],
+   "perche": "La spesa europea per la difesa è in aumento strutturale e dipende poco dal ciclo dei mercati."},
+  {"titolo": "Oro fisico", "match": ["PHYSICAL GOLD", "GOLD ETC"],
+   "perche": "Non paga cedole e non produce nulla. Serve esattamente quando tutto il resto scende."},
+  {"titolo": "DELTA UCITS", "match": ["DELTA UCITS", "DELTA FUND"],
+   "perche": "Usa in modo sistematico strumenti opzionari per partecipare ai rialzi limitando l'ampiezza delle discese."}
+ ],
+
+ "note_metodologiche": [
+  ["Rendimento lordo e rendimento netto", "Tutti i rendimenti di questo documento sono al <b>lordo delle commissioni</b>: misurano quanto ha reso la gestione, ed è la stessa base su cui si calcola l'eventuale commissione di incentivo. Il rendimento <b>netto</b> compare una volta sola, nel quadro patrimoniale, dove la differenza è visibile come riga di commissioni."],
+  ["Metodologia", "Il rendimento è calcolato con il metodo <i>time-weighted</i>: neutralizza l'effetto di apporti e prelievi, così il risultato riflette solo le scelte di gestione e non i movimenti di cassa. Il parametro di riferimento è ricostruito con la stessa frequenza giornaliera. L'imposta di bollo, essendo un onere fiscale e non un costo del servizio, non entra nel calcolo del rendimento."],
+  ["I tre reparti", "«Difesa», «centrocampo» e «attacco» sono il nostro modo di raggruppare gli strumenti in base alla funzione che hanno nel portafoglio. Non sostituiscono la classificazione per classi di attività, che guarda invece l'esposizione economica effettiva scomponendo i comparti UCITS e tenendo conto dei derivati di copertura. Le due letture rispondono a due domande diverse: come è costruito il portafoglio, e a che cosa è esposto."],
+  ["Prospetto dei movimenti", "L'elenco analitico delle operazioni eseguite nel periodo, con data, quantità, prezzo e controvalore di ciascuna, è riportato nel prospetto contabile allegato al presente rendiconto."]
+ ],
+
+ "chiusura": "Restiamo a disposizione per commentare insieme questo documento."
+}

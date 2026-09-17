@@ -1,13 +1,23 @@
 # -*- coding: utf-8 -*-
-"""Report Cliente (PDF one-pager elegante, frontespizio BIANCO con logo a colori).
-Pag.1: valore + guadagno EUR, performance YTD vs benchmark + extra-rendimento (grafico a barre),
-come e' investito (ciambella + tabella + barre settori), parte obbligazionaria (duration + tipologie),
-esposizione valutaria look-through. Pag.2: allegato posizioni complete per categoria.
-Azioni = esposizione azionaria look-through (dirette + fondi + indici). Dati live da Oracle.
-Marchio Camperio + footer di legge + disclaimer MiFID."""
+"""Report al cliente: Sintetica (1 pagina) e Sintesi Cliente (3 pagine).
+
+Layout "Comitato Investimenti" (motore condiviso in `pdf_comune`): banda dei cinque
+numeri, grafico piu' narrativa, blocco composizione con le classi di esposizione e i
+tre reparti, allegato con tutte le posizioni.
+
+I rendimenti esposti sono al **lordo** delle commissioni (`camperio_core.portfolio.rendimento`):
+`SRE.TCLI` e' netto e non e' quello che si mostra al cliente. I testi editoriali
+(ruoli dei reparti, convinzioni, perche') stanno in `contenuti/<linea>.json`.
+
+Il Rendiconto periodico e' in `report_rendiconto.py`.
+"""
 import os, re, datetime, tempfile
+import contenuti as CONT
 import data_layer as DL
 import lookthrough as L
+import pdf_comune as PC
+from camperio_core.portfolio import methodology as M
+from camperio_core.portfolio import rendimento as RD
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _LOGO_W = os.path.join(HERE, "static", "logo-bianco.png")
@@ -84,11 +94,19 @@ def build_cliente(pf, repo_dir, livello=1):
     info = DL.contract_info(meta["schema"], meta["codcli"])
     ex = DL.comitato_extra(meta["schema"], meta["codcli"], meta.get("data_prec"), meta["data"])
     nav = float(ex.get("nav_al") or meta.get("nav") or 0) or 1.0
-    base = ex.get("nav_base")
-    ytd_p = (ex["tcli_al"] / ex["tcli_base"] - 1) if ex.get("tcli_base") else None
-    ytd_b = (ex["tbmk_al"] / ex["tbmk_base"] - 1) if ex.get("tbmk_base") else None
+    nav_inizio = ex.get("nav_base")
+    # Rendimento: al cliente si espone il LORDO, restituendo al montante le commissioni
+    # Camperio IVA inclusa (MOV.CTVREG). TCLI e' netto: e' l'errore piu' facile da fare.
+    data_base = ex.get("data_base") or (str(int(meta["data"][:4]) - 1) + "-12-31")
+    comm = DL.commissioni(meta["schema"], meta["codcli"], data_base, meta["data"])
+    ytd_n = RD.rendimento_netto(ex.get("tcli_base"), ex.get("tcli_al"))
+    ytd_p = RD.rendimento_lordo(ex.get("tcli_base"), ex.get("tcli_al"), comm)
+    ytd_b = RD.rendimento_benchmark(ex.get("tbmk_base"), ex.get("tbmk_al"))
     extra = (ytd_p - ytd_b) if (ytd_p is not None and ytd_b is not None) else None
-    gain = (base * ytd_p) if (base and ytd_p is not None) else None
+    comm_tot = RD.totale_commissioni(comm)
+    patr = DL.quadro_patrimoniale(meta["schema"], meta["codcli"], data_base, meta["data"]) or {}
+    gain = RD.risultato_lordo(patr.get("risultato_netto"), comm) if patr.get("risultato_netto") is not None \
+        else ((nav_inizio * ytd_p) if (nav_inizio and ytd_p is not None) else None)
     try:
         al_date = datetime.date.fromisoformat(meta["data"])
         giorni = (al_date - datetime.date(2025, 12, 31)).days
@@ -118,9 +136,9 @@ def build_cliente(pf, repo_dir, livello=1):
     bond_dir = sum(r["val"] for r in cats.get("Obbligazioni", []))
     gold = sum(r["val"] for r in cats.get("Oro", []))
     cashv = sum(r["val"] for r in cats.get("Liquidità", []))
-    base = (nav + der_eq) if (nav + der_eq) else nav  # base gestionale: patrimonio al netto del nozionale derivati azionari
-    alloc = [("Azioni", esp_az, esp_az / base), ("Obbligazioni", bond_dir, bond_dir / base),
-             ("Alternativi (Oro)", gold, gold / base), ("Liquidità", cashv, cashv / base)]
+    base_alloc = (nav + der_eq) if (nav + der_eq) else nav  # base delle allocazioni: patrimonio al netto del nozionale dei derivati azionari
+    alloc = [("Azioni", esp_az, esp_az / base_alloc), ("Obbligazioni", bond_dir, bond_dir / base_alloc),
+             ("Alternativi (Oro)", gold, gold / base_alloc), ("Liquidità", cashv, cashv / base_alloc)]
     # parte obbligazionaria
     bonds = cats.get("Obbligazioni", [])
     durata = None
@@ -150,12 +168,39 @@ def build_cliente(pf, repo_dir, livello=1):
                              "val": x["valorefut"], "pct": x["valorefut"] / nav, "sett": "Derivati"} for x in dpz]
     n_pos = sum(len(v) for v in cats.values())
     val_titoli = sum(r["val"] for c, rows in cats.items() if c != "Liquidità" for r in rows)
+    # I tre reparti (Difesa / Centro Campo / Attacco) dal framework di camperio_core:
+    # guardano gli strumenti per come sono detenuti, non l'esposizione economica.
+    rep = {}
+    for p in pf["positions"]:
+        v = p.get("valmer", 0.0)
+        if not v:
+            continue
+        r = rep.setdefault(p.get("macro") or "Altro", {"val": 0.0, "n": 0, "pos": [], "sub": {}})
+        r["val"] += v
+        r["n"] += 1
+        r["pos"].append({"nome": PC.nome(p.get("des")), "val": v, "pct": v / nav,
+                         "isin": p.get("isin") or "", "ccy": p.get("ccy") or "EUR",
+                         "sub": p.get("sub") or "", "divisa": p.get("divisa") or "",
+                         "quanti": p.get("quanti"), "costmed": p.get("costmed"),
+                         "unimer": p.get("unimer"), "camuni": p.get("camuni")})
+        r["sub"][p.get("sub") or ""] = r["sub"].get(p.get("sub") or "", 0.0) + v
+    for r in rep.values():
+        r["pct"] = r["val"] / nav if nav else None
+        r["pos"].sort(key=lambda x: -x["val"])
+    reparti = [(k, rep[k]) for k in M.MACRO_ORDER if k in rep]
+    testi = CONT.carica(info["linea"])
+    convinzioni = CONT.convinzioni_con_peso(testi, pf["positions"], nav)
     return {"descli": info["descli"], "codcli": meta["codcli"], "linea": info["linea"] or "—",
             "bench": ex.get("bench", ""), "data": DL._fmt_it(meta["data"]), "iso": meta["data"],
-            "nav": nav, "nav_base": base, "giorni": giorni,
+            "nav": nav, "nav_inizio": nav_inizio, "base_alloc": base_alloc,
+            "patrimoniale": patr, "giorni": giorni,
             "ytd_p": ytd_p, "ytd_b": ytd_b, "extra": extra, "gain": gain,
             "alloc": alloc, "bonds_pct": bond_dir / nav, "durata": durata, "bond_break": bond_break,
-            "fx": fx, "cats": cats, "sett": sett_sorted, "n_pos": n_pos, "val_titoli": val_titoli}
+            "fx": fx, "cats": cats, "sett": sett_sorted, "n_pos": n_pos, "val_titoli": val_titoli,
+            "ytd_n": ytd_n, "comm": comm, "comm_tot": comm_tot, "data_base": data_base,
+            "reparti": reparti, "testi": testi, "convinzioni": convinzioni,
+            "schema": meta["schema"], "der_eq": der_eq,
+            "tcli_al": ex.get("tcli_al"), "tbmk_al": ex.get("tbmk_al")}
 
 # ============================== grafici (matplotlib) ==============================
 def _charts(d, tmp):
@@ -168,18 +213,18 @@ def _charts(d, tmp):
     # 1) barre performance
     fig, ax = plt.subplots(figsize=(3.0, 2.2), dpi=200)
     vals = [(d["ytd_p"] or 0) * 100, (d["ytd_b"] or 0) * 100]
-    bars = ax.bar(["Linea " + d["linea"], "Benchmark"], vals, color=[VERDE if vals[0] >= 0 else ROSSO, "#B9B9B9"], width=0.6)
+    bars = ax.bar(["Linea " + d["linea"], "Parametro"], vals, color=[VERDE if vals[0] >= 0 else ROSSO, "#B9B9B9"], width=0.6)
     for b, v in zip(bars, vals):
         ax.text(b.get_x() + b.get_width() / 2, v + 0.2, ("+%.2f%%" % v).replace(".", ","), ha="center", va="bottom",
                 fontsize=9, fontweight="bold", color=BLU)
-    ax.set_ylabel("Performance da inizio 2026", fontsize=7.5, color=GRIGIO)
+    ax.set_ylabel("Rendimento da inizio anno, al lordo", fontsize=7.5, color=GRIGIO)
     ax.spines[["top", "right"]].set_visible(False); ax.spines[["left", "bottom"]].set_color(RIGA)
     ax.tick_params(colors=GRIGIO, labelsize=7.5); ax.margins(y=0.25)
     fig.tight_layout(); p = os.path.join(tmp, "perf.png"); fig.savefig(p, transparent=True); plt.close(fig); out["perf"] = p
     # 2) ciambella allocazione
     fig, ax = plt.subplots(figsize=(2.5, 2.5), dpi=200)
     labels = [a[0] for a in d["alloc"]]; sizes = [max(a[1], 0) for a in d["alloc"]]
-    cols = [BLU, BLU2, ORO, "#B9B9B9"]
+    cols = [ARANCIO, BLU2, VERDE, "#8C93A8"]
     ax.pie(sizes, colors=cols[:len(sizes)], startangle=90, counterclock=False,
            wedgeprops=dict(width=0.42, edgecolor="white", linewidth=1.5))
     ax.text(0, 0, "€ %.2fM" % (d["nav"] / 1e6), ha="center", va="center", fontsize=11, fontweight="bold", color=BLU)
@@ -209,153 +254,298 @@ def _charts(d, tmp):
         fig.tight_layout(); p = os.path.join(tmp, "dur.png"); fig.savefig(p, transparent=True); plt.close(fig); out["dur"] = p
     return out
 
-# ============================== PDF (reportlab) ==============================
-def cliente_pdf(d, path):
-    from reportlab.lib.pagesizes import A4
+# ============================== PDF: elementi condivisi ==============================
+def _img(ch, key, wmm, hmm):
+    from reportlab.platypus import Image, Spacer
     from reportlab.lib.units import mm
+    return Image(ch[key], width=wmm * mm, height=hmm * mm) if key in ch else Spacer(1, 1)
+
+
+def _banda(d, cw):
+    """La banda dei cinque numeri: valore, risultato, rendimento lordo, parametro, extra."""
+    c = PC.colore_segno(d["ytd_p"])
+    return PC.banda(cw, [
+        ("€ " + PC.eur(d["nav"]), "Valore del portafoglio", PC.BLU),
+        ("€ " + PC.eur(d["gain"]) if d["gain"] is not None else "—", "Risultato lordo del periodo", c),
+        (PC.sg(d["ytd_p"]), "Rendimento lordo", c),
+        (PC.sg(d["ytd_b"]), "Parametro di riferimento", PC.BLU),
+        (PC.sg(d["extra"]).replace("%", "") + " p.p.", "Extra-rendimento", c)])
+
+
+def _perf_e_narrativa(d, cw, s, ch):
+    """Grafico performance a sinistra, due paragrafi e la nota metodologica a destra."""
+    from reportlab.platypus import Paragraph
+    gg = (" in %d giorni di gestione" % d["giorni"]) if d.get("giorni") else ""
+    testo = [
+        Paragraph("Da inizio anno la gestione ha reso <b>%s</b> contro il <b>%s</b> del parametro di "
+                  "riferimento: <b>%s punti percentuali</b> in più."
+                  % (PC.sg(d["ytd_p"]), PC.sg(d["ytd_b"]), PC.sg(d["extra"]).replace("%", "")), s["body"]),
+        Paragraph("Il valore del portafoglio è passato da € %s a <b>€ %s</b>, con un risultato di "
+                  "<b>€ %s</b>%s." % (PC.eur(d["nav_inizio"]), PC.eur(d["nav"]),
+                                      PC.eur(d["gain"]) if d["gain"] is not None else "—", gg), s["body"]),
+        Paragraph("Rendimento al lordo delle commissioni, calcolato con metodologia time-weighted. "
+                  "Parametro di riferimento della linea: %s." % (d["bench"] or "—"), s["nota"])]
+    return PC.affianca(_img(ch, "perf", 60, 44), testo, cw, quota=0.33)
+
+
+def _composizione(d, cw, s, ch):
+    """Ciambella, tabella delle classi, tabella dei tre reparti, barre dei settori."""
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+    # Il grafico dei settori ha senso solo se i settori sono davvero mappati: in DEMO,
+    # senza il Repository_Fondi, finiscono tutti in "n.d." e una barra sola non dice nulla.
+    settori = [(k, r) for k, r in (d.get("sett") or []) if k and k.lower() not in ("n.d.", "altro")]
+    con_settori = "sett" in ch and len(settori) >= 2
+    larg = (cw * 0.39) if con_settori else (cw * 0.62)
+    rip = [[Paragraph("Ripartizione", s["th"]), Paragraph("Controvalore €", s["thr"]),
+            Paragraph("%", s["thr"])]]
+    for nome_, val, pp in d["alloc"]:
+        rip.append([Paragraph(nome_, s["cell"]), PC.eur(val, 2), PC.pct(pp)])
+    t1 = PC.tabella(rip, [larg * 0.50, larg * 0.32, larg * 0.18], destra=[1, 2], fs=7.6, pad=3.4)
+    tre = [[Paragraph("I tre reparti", s["th"]), Paragraph("Controvalore €", s["thr"]),
+            Paragraph("%", s["thr"])]]
+    for k, r in d["reparti"]:
+        tre.append([Paragraph("<b>%s</b>" % k, s["cellb"]), PC.eur(r["val"], 2), PC.pct(r["pct"])])
+    t2 = PC.tabella(tre, [larg * 0.50, larg * 0.32, larg * 0.18], destra=[1, 2], fs=7.6, pad=3.4)
+    pila = Table([[t1], [Spacer(1, 7)], [t2]], colWidths=[larg])
+    pila.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                              ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+    if con_settori:
+        celle = [[_img(ch, "donut", 40, 40), pila, _img(ch, "sett", 62, 47)]]
+        larghezze = [cw * 0.24, cw * 0.40, cw * 0.36]
+    else:
+        celle = [[_img(ch, "donut", 44, 44), pila]]
+        larghezze = [cw * 0.30, cw * 0.70]
+    tri = Table(celle, colWidths=larghezze)
+    tri.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                             ("LEFTPADDING", (0, 0), (0, 0), 0), ("LEFTPADDING", (1, 0), (-1, 0), 5),
+                             ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                             ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+    return tri
+
+
+def _nota_composizione(d, s):
+    from reportlab.platypus import Paragraph
+    cop = ""
+    if d.get("der_eq"):
+        cop = (" al netto delle coperture in derivati su indice (esposizione delta %s)"
+               % PC.sg(d["der_eq"] / d["nav"] if d["nav"] else None, 1))
+    return Paragraph("«Azioni» comprende le azioni dirette, gli ETF azionari e i comparti UCITS scomposti "
+                     "nelle loro componenti%s. I tre reparti guardano invece gli strumenti per come sono "
+                     "detenuti: è la logica con cui il portafoglio viene costruito." % cop, s["nota"])
+
+
+def _obbligazionaria(d, cw, s, ch):
+    from reportlab.platypus import Paragraph
+    dur = (("La vita residua media del comparto è di <b>%s anni</b>. "
+            % PC.eur(d["durata"], 2)) if d.get("durata") is not None else "")
+    bb = " · ".join("%s %s" % (k, PC.pct(p)) for k, v, p in d["bond_break"])
+    testo = [Paragraph("Il <b>%s</b> del patrimonio è investito in obbligazioni, in prevalenza titoli di "
+                       "Stato e sovranazionali a scadenza breve. %s" % (PC.pct(d["bonds_pct"]), dur), s["body"]),
+             Paragraph(bb, s["body"])]
+    return PC.affianca(_img(ch, "dur", 60, 14), testo, cw, quota=0.36)
+
+
+def _posizioni_principali(d, cw, s, n=5):
+    """Prime cinque posizioni e prime cinque azioni, affiancate."""
+    from reportlab.platypus import Paragraph, Table, TableStyle
+    tutte = sorted((r for rows in d["cats"].values() for r in rows), key=lambda r: -r["val"])
+    azioni = sorted(d["cats"].get("Azioni", []), key=lambda r: -r["val"])
+
+    def mini(titolo, righe):
+        dati = [[Paragraph(titolo, s["th"]), Paragraph("Controvalore €", s["thr"]),
+                 Paragraph("%", s["thr"])]]
+        for r in righe[:n]:
+            dati.append([Paragraph(PC.nome(r["nome"]), s["cell"]), PC.eur(r["val"]), PC.pct(r["pct"])])
+        return PC.tabella(dati, [cw * 0.255, cw * 0.14, cw * 0.075], destra=[1, 2], fs=7.4, pad=3.0)
+
+    due = Table([[mini("Prime cinque posizioni", tutte), mini("Prime cinque azioni", azioni)]],
+                colWidths=[cw * 0.50, cw * 0.50])
+    due.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
+                             ("LEFTPADDING", (0, 0), (0, 0), 0), ("RIGHTPADDING", (0, 0), (0, 0), 12),
+                             ("LEFTPADDING", (1, 0), (1, 0), 12), ("RIGHTPADDING", (1, 0), (1, 0), 0),
+                             ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+    return due
+
+
+def _testata(d):
+    return {"descli": d["descli"], "linea": d["linea"], "codcli": d["codcli"], "data": d["data"]}
+
+
+# ============================== Sintetica (1 pagina) ==============================
+def sintetica_pdf(d, path):
+    """Una pagina: banda, performance, composizione, posizioni principali."""
+    from reportlab.platypus import Paragraph, Spacer
+    s = PC.stili()
+    doc, cw = PC.documento(path, _testata(d), "Linea %s — Sintetica · conto %s" % (d["linea"], d["codcli"]))
+    ch = _charts(d, tempfile.mkdtemp(prefix="sint_"))
+    E = [Paragraph("LA TUA GESTIONE PATRIMONIALE", s["ey"]),
+         Paragraph("Linea %s — Sintesi" % d["linea"], s["h1"]),
+         Paragraph("Situazione al %s" % d["data"], s["sub"]), Spacer(1, 9),
+         _banda(d, cw), Spacer(1, 11),
+         _perf_e_narrativa(d, cw, s, ch),
+         Paragraph("Come è investito il portafoglio", s["sec"]),
+         _composizione(d, cw, s, ch), _nota_composizione(d, s),
+         Paragraph("Le posizioni principali", s["sec"]),
+         _posizioni_principali(d, cw, s),
+         Paragraph("L'elenco completo delle %d posizioni è riportato nella Sintesi Cliente e nel Rendiconto."
+                   % d["n_pos"], s["nota"])]
+    doc.build(E)
+    return path
+
+
+# ============================== Sintesi Cliente (3 pagine) ==============================
+def sintesi_pdf(d, path):
+    """Tre pagine: sintesi, perché e convinzioni, allegato con tutte le posizioni."""
+    from reportlab.lib.enums import TA_RIGHT
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import PageBreak, Paragraph, Spacer, Table, TableStyle
+    s = PC.stili()
+    t = d["testi"]
+    doc, cw = PC.documento(path, _testata(d), "Linea %s — Sintesi Cliente · conto %s" % (d["linea"], d["codcli"]))
+    ch = _charts(d, tempfile.mkdtemp(prefix="sint3_"))
+
+    E = [Paragraph("LA TUA GESTIONE PATRIMONIALE", s["ey"]),
+         Paragraph("Linea %s — Sintesi" % d["linea"], s["h1"]),
+         Paragraph("Situazione al %s" % d["data"], s["sub"]), Spacer(1, 9),
+         _banda(d, cw), Spacer(1, 11),
+         _perf_e_narrativa(d, cw, s, ch),
+         Paragraph("Come è investito il portafoglio", s["sec"]),
+         _composizione(d, cw, s, ch), _nota_composizione(d, s)]
+    if d["bonds_pct"]:
+        E += [Paragraph("La parte obbligazionaria", s["sec"]), _obbligazionaria(d, cw, s, ch)]
+    if d["fx"]:
+        E += [Paragraph("Esposizione valutaria", s["sec"]),
+              Paragraph(" · ".join("<b>%s</b> %s" % (r["ccy"], PC.pct(r["pct"])) for r in d["fx"]), s["body"]),
+              Paragraph("Esposizione in trasparenza sui comparti UCITS (valute sottostanti). L'oro è "
+                        "considerato una classe a sé.", s["nota"])]
+
+    # ---- pagina 2: perché e convinzioni ----
+    E.append(PageBreak())
+    E += [Paragraph("IL NOSTRO MODO DI LAVORARE", s["ey"]),
+          Paragraph("Perché il portafoglio è fatto così", s["h1"]), Spacer(1, 9)]
+    for par in t.get("perche") or []:
+        E.append(Paragraph(par, s["body"]))
+    kpi = [("%d" % d["n_pos"], "strumenti detenuti direttamente")]
+    az = d["cats"].get("Azioni") or []
+    if az:
+        kpi.append(("%d" % len(az), "azioni scelte una per una"))
+        kpi.append((PC.pct(max(r["pct"] for r in az)), "peso della prima azione"))
+    dif = dict(d["reparti"]).get("Difesa")
+    if dif:
+        kpi.append((PC.pct(dif["pct"]), "del patrimonio ha il compito di proteggere"))
+    NB = ParagraphStyle("nb", fontName="Helvetica-Bold", fontSize=17, leading=21, textColor=PC.BLU)
+    kt = Table([[[Paragraph(v, NB), Paragraph(l, s["kl"])] for v, l in kpi]],
+               colWidths=[cw / len(kpi)] * len(kpi))
+    kt.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), PC.ALT), ("BOX", (0, 0), (-1, -1), 0.5, PC.RIGA),
+                            ("INNERGRID", (0, 0), (-1, -1), 0.5, PC.RIGA),
+                            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                            ("LEFTPADDING", (0, 0), (-1, -1), 8), ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                            ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 8)]))
+    E.append(kt)
+    if d["convinzioni"]:
+        E.append(Paragraph("Le nostre convinzioni", s["sec"]))
+        if t.get("convinzioni_premessa"):
+            E.append(Paragraph(t["convinzioni_premessa"], s["body"]))
+        CN = ParagraphStyle("cn", fontName="Helvetica-Bold", fontSize=8, leading=10.8, textColor=PC.BLU)
+        CP = ParagraphStyle("cp", fontName="Helvetica-Bold", fontSize=8, leading=10.8,
+                            textColor=PC.VERDE, alignment=TA_RIGHT)
+        CV = ParagraphStyle("cv", fontName="Helvetica", fontSize=8, leading=10.8, textColor=PC.TESTO)
+        righe = [[Paragraph("Posizione", s["th"]), Paragraph("Peso", s["thr"]),
+                  Paragraph("Perché è in portafoglio", s["th"])]]
+        for c in d["convinzioni"]:
+            righe.append([Paragraph(c["titolo"], CN), Paragraph(PC.pct(c["pct"]), CP),
+                          Paragraph(c["perche"], CV)])
+        tc = PC.tabella(righe, [cw * 0.21, cw * 0.09, cw * 0.70], destra=[1], fs=8, pad=3.6, zebra=False)
+        E.append(tc)
+        E.append(Paragraph("Le note di gestione esprimono la posizione di Camperio SIM alla data del "
+                           "documento e possono cambiare nel tempo.", s["nota"]))
+
+    # ---- pagina 3: allegato, tutte le posizioni su una pagina in tre colonne ----
+    E.append(PageBreak())
+    E += [Paragraph("ALLEGATO", s["ey"]),
+          Paragraph("Elenco completo delle posizioni", s["h1"]),
+          Paragraph("Tutte le %d posizioni al %s, raggruppate per reparto e per comparto"
+                    % (d["n_pos"], d["data"]), s["sub"]), Spacer(1, 7)]
+    E.append(_allegato_tre_colonne(d, cw))
+    E.append(Paragraph("Percentuali calcolate sul patrimonio complessivo di € %s. Quantità, prezzi e ISIN "
+                       "di ogni posizione sono nel prospetto analitico del Rendiconto." % PC.eur(d["nav"], 2),
+                       s["nota"]))
+    doc.build(E)
+    return path
+
+
+def _allegato_tre_colonne(d, cw):
+    """Tutte le posizioni su una sola pagina, tre colonne, raggruppate per reparto e comparto.
+
+    Il punto di taglio fra le colonne arretra finche' l'ultima riga non e' un'intestazione:
+    altrimenti un titolo di reparto o di comparto resta orfano a pie' di colonna.
+    """
     from reportlab.lib import colors
-    from reportlab.platypus import (BaseDocTemplate, PageTemplate, Frame, Paragraph, Spacer,
-                                    Table, TableStyle, Image, KeepTogether, PageBreak)
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_RIGHT, TA_CENTER, TA_LEFT
-    blu = colors.HexColor(BLU); blu2 = colors.HexColor(BLU2); gri = colors.HexColor(GRIGIO)
-    verde = colors.HexColor(VERDE); rosso = colors.HexColor(ROSSO); riga = colors.HexColor(RIGA); alt = colors.HexColor(ALT)
-    pc = verde if (d["ytd_p"] or 0) >= 0 else rosso
-    ss = getSampleStyleSheet()
-    SUP = ParagraphStyle("SUP", parent=ss["Normal"], fontName="Helvetica-Bold", fontSize=8, textColor=blu2, spaceAfter=1)
-    TIT = ParagraphStyle("TIT", parent=ss["Normal"], fontName="Helvetica-Bold", fontSize=19, textColor=blu, spaceAfter=1, leading=21)
-    SUB = ParagraphStyle("SUB", parent=ss["Normal"], fontSize=9.5, textColor=gri, spaceAfter=8)
-    H = ParagraphStyle("H", parent=ss["Normal"], fontName="Helvetica-Bold", fontSize=12, textColor=blu, spaceBefore=12, spaceAfter=5)
-    P = ParagraphStyle("P", parent=ss["Normal"], fontSize=9.5, leading=14)
-    Psm = ParagraphStyle("Psm", parent=P, fontSize=7.8, textColor=gri, leading=10.5)
-    tmp = tempfile.mkdtemp(prefix="cli_")
-    ch = _charts(d, tmp)
+    from reportlab.lib.enums import TA_RIGHT
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import Paragraph, Table, TableStyle
+    F = 6.5
+    RN = ParagraphStyle("rn", fontName="Helvetica", fontSize=F, leading=F * 1.25,
+                        textColor=colors.HexColor("#1A1A1A"))
+    RV = ParagraphStyle("rv", fontName="Helvetica", fontSize=F, leading=F * 1.25,
+                        alignment=TA_RIGHT, textColor=colors.HexColor("#444444"))
+    RP = ParagraphStyle("rp", fontName="Helvetica-Bold", fontSize=F, leading=F * 1.25,
+                        alignment=TA_RIGHT, textColor=PC.BLU)
+    HS = ParagraphStyle("hs", fontName="Helvetica-Bold", fontSize=F - 0.1, leading=F * 1.3,
+                        textColor=PC.GRIGIO)
+    HR = ParagraphStyle("hr", fontName="Helvetica-Bold", fontSize=F + 0.9, leading=F * 1.5,
+                        textColor=colors.white)
+    HRP = ParagraphStyle("hrp", fontName="Helvetica-Bold", fontSize=F + 0.9, leading=F * 1.5,
+                         textColor=colors.white, alignment=TA_RIGHT)
 
-    def on_page(canvas, doc):
-        canvas.saveState(); w, h = A4
-        try: canvas.drawImage(_LOGO_COL, 18 * mm, h - 20 * mm, width=46 * mm, height=46 / 2.99 * mm, preserveAspectRatio=True, mask="auto")
-        except Exception: pass
-        canvas.setFillColor(blu); canvas.setFont("Helvetica-Bold", 10)
-        canvas.drawRightString(w - 18 * mm, h - 12 * mm, d["descli"])
-        canvas.setFillColor(gri); canvas.setFont("Helvetica", 8)
-        canvas.drawRightString(w - 18 * mm, h - 16.5 * mm, "Linea %s · conto %s · al %s" % (d["linea"], d["codcli"], d["data"]))
-        canvas.drawRightString(w - 18 * mm, h - 20 * mm, "Documento riservato e personale")
-        canvas.setStrokeColor(riga); canvas.setLineWidth(0.7); canvas.line(18 * mm, h - 23 * mm, w - 18 * mm, h - 23 * mm)
-        canvas.setFillColor(gri); canvas.setFont("Helvetica", 6.2)
-        canvas.drawCentredString(w / 2, 15.5 * mm, _F1)
-        canvas.drawCentredString(w / 2, 13 * mm, _F2A); canvas.drawCentredString(w / 2, 11 * mm, _F2B)
-        canvas.setFont("Helvetica-Oblique", 5.9); canvas.drawCentredString(w / 2, 8.8 * mm, _DISC)
-        # riga propria: il disclaimer centrato è largo abbastanza da coprire il
-        # numero di pagina se condividono la stessa riga
-        canvas.setFont("Helvetica", 7); canvas.drawRightString(w - 18 * mm, 6.3 * mm, "Pag. %d" % doc.page)
-        canvas.restoreState()
+    righe = []
+    for k, r in d["reparti"]:
+        righe.append(("rep", k, r["pct"]))
+        for sub, val in sorted(r["sub"].items(), key=lambda kv: -kv[1]):
+            righe.append(("set", sub or "Altro", val / d["nav"] if d["nav"] else 0))
+            for p in r["pos"]:
+                if (p["sub"] or "") == sub:
+                    righe.append(("tit", p["nome"], p["pct"]))
+    n = len(righe)
+    per = -(-n // 3)
+    tagli = []
+    start = 0
+    for _ in range(2):
+        k = min(start + per, n)
+        while k < n and righe[k - 1][0] in ("rep", "set"):
+            k -= 1
+        tagli.append((start, k))
+        start = k
+    tagli.append((start, n))
+    CWc = cw / 3.0 - 4
 
-    def img(key, wmm, hmm):
-        return Image(ch[key], width=wmm * mm, height=hmm * mm) if key in ch else Spacer(1, 1)
-
-    story = []
-    story.append(Paragraph("LA TUA GESTIONE PATRIMONIALE", SUP))
-    story.append(Paragraph("Linea %s — Sintesi" % d["linea"], TIT))
-    story.append(Paragraph("Situazione al %s" % d["data"], SUB))
-    # KPI riga (numeri grandi, niente box)
-    def kv(val, lbl, color):
-        return [Paragraph(val, ParagraphStyle("kvv", parent=P, fontName="Helvetica-Bold", fontSize=15, textColor=color, alignment=TA_LEFT, leading=17)),
-                Paragraph(lbl, ParagraphStyle("kll", parent=Psm, fontSize=7.5, alignment=TA_LEFT))]
-    kpi = [kv(_eur(d["nav"]), "Valore del portafoglio", blu)
-           + kv(_eur(d["gain"]) if d["gain"] is not None else "n.d.", "Guadagno YTD (€)", pc)
-           + kv(_pct(d["ytd_p"], True, 2), "Performance YTD", pc)
-           + kv(_pct(d["ytd_b"], True, 2), "Benchmark YTD", blu)
-           + kv(_pct(d["extra"], True, 2) + " p.p.", "Extra-rendimento", pc)]
-    # build a 2-row table: values row, labels row
-    vals_row = [kpi[0][0], kpi[0][2], kpi[0][4], kpi[0][6], kpi[0][8]]
-    lbls_row = [kpi[0][1], kpi[0][3], kpi[0][5], kpi[0][7], kpi[0][9]]
-    kt = Table([vals_row, lbls_row], colWidths=[36 * mm] * 5)
-    kt.setStyle(TableStyle([("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, 0), 0),
-                            ("BOTTOMPADDING", (0, 1), (-1, 1), 6), ("LINEBELOW", (0, 1), (-1, 1), 0.7, riga)]))
-    story.append(kt); story.append(Spacer(1, 8))
-
-    # perf chart + narrativa
-    verso = "una sovraperformance" if (d["extra"] or 0) >= 0 else "una sottoperformance"
-    gg = ("in %d giorni" % d["giorni"]) if d["giorni"] else ""
-    narr = Paragraph(
-        "Da inizio 2026 la gestione ha reso <b>%s</b> contro il %s del parametro di riferimento: %s di <b>%s p.p.</b><br/><br/>"
-        "Il valore è passato da %s a <b>%s</b>, con un risultato di <b>%s</b> %s."
-        % (_pct(d["ytd_p"], True, 2), _pct(d["ytd_b"], True, 2), verso,
-           _pct(abs(d["extra"]) if d["extra"] is not None else None, False, 2), _eur(d["nav_base"]) if d["nav_base"] else "n.d.",
-           _eur(d["nav"]), _eur(d["gain"]) if d["gain"] is not None else "n.d.", gg), P)
-    row = Table([[img("perf", 72, 53), narr]], colWidths=[78 * mm, 96 * mm])
-    row.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (1, 0), (1, 0), 8)]))
-    story.append(row)
-
-    # come e' investito: donut + tabella | barre settori
-    story.append(Paragraph("Come è investito il portafoglio", H))
-    arows = [[Paragraph("Ripartizione", ParagraphStyle("th", parent=Psm, fontName="Helvetica-Bold", textColor=colors.white)),
-              Paragraph("%", ParagraphStyle("thr", parent=Psm, fontName="Helvetica-Bold", textColor=colors.white, alignment=TA_RIGHT))]]
-    for nome, val, pp in d["alloc"]:
-        arows.append([Paragraph(nome, Psm), Paragraph(_pct(pp, False, 0), ParagraphStyle("r", parent=Psm, alignment=TA_RIGHT))])
-    atab = Table(arows, colWidths=[33 * mm, 16 * mm])
-    atab.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), blu), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, alt]),
-                              ("LINEBELOW", (0, 0), (-1, -1), 0.3, riga), ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
-    left = Table([[img("donut", 46, 46), atab]], colWidths=[48 * mm, 51 * mm])
-    left.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
-    inv = Table([[left, img("sett", 74, 56)]], colWidths=[101 * mm, 74 * mm])
-    inv.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
-    story.append(inv)
-    story.append(Paragraph("«Azioni» = azioni dirette + fondi UCITS azionari (dato Oracle). Il portafoglio detiene inoltre un future S&P short di copertura (esposizione delta −6,9%).", Psm))
-
-    # parte obbligazionaria
-    story.append(Paragraph("La parte obbligazionaria: solidità e bassa duration", H))
-    bb = " · ".join("%s %s" % (k, _pct(p)) for k, v, p in d["bond_break"])
-    durtxt = ("La durata finanziaria media è di circa <b>%s anni</b>: rischio di tasso contenuto. " % (("%.2f" % d["durata"]).replace(".", ","))) if d["durata"] is not None else ""
-    btext = Paragraph("Circa il <b>%s</b> del portafoglio è in obbligazioni di elevata qualità (in prevalenza titoli di Stato), "
-                      "con scadenze brevi. %s<br/><br/>%s" % (_pct(d["bonds_pct"]), durtxt, bb), P)
-    brow = Table([[img("dur", 72, 17), btext]], colWidths=[78 * mm, 96 * mm])
-    brow.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (1, 0), (1, 0), 8)]))
-    story.append(brow)
-
-    # esposizione valutaria
-    story.append(Paragraph("Esposizione valutaria", H))
-    story.append(Paragraph(" · ".join("<b>%s</b> %s" % (r["ccy"], _pct(r["pct"])) for r in d["fx"]), P))
-    story.append(Paragraph("Esposizione in trasparenza sui fondi (valute sottostanti). La componente in euro è prevalente; "
-                           "il dollaro USA è la principale valuta estera. L'oro è considerato a sé.", Psm))
-
-    # ===== ALLEGATO =====
-    story.append(PageBreak())
-    story.append(Paragraph("ALLEGATO", SUP))
-    story.append(Paragraph("Elenco completo delle posizioni", TIT))
-    story.append(Paragraph("Tutte le posizioni al %s raggruppate per categoria: ISIN, descrizione, controvalore e peso." % d["data"], SUB))
-
-    def postable(rows, intest, total=True):
-        data = [[Paragraph(intest, ParagraphStyle("h", parent=Psm, fontName="Helvetica-Bold", textColor=colors.white)),
-                 Paragraph("ISIN", ParagraphStyle("h2", parent=Psm, fontName="Helvetica-Bold", textColor=colors.white)),
-                 Paragraph("Controv.", ParagraphStyle("h3", parent=Psm, fontName="Helvetica-Bold", textColor=colors.white, alignment=TA_RIGHT)),
-                 Paragraph("%", ParagraphStyle("h4", parent=Psm, fontName="Helvetica-Bold", textColor=colors.white, alignment=TA_RIGHT))]]
-        for r in rows:
-            data.append([Paragraph(r["nome"][:40], Psm), Paragraph(r["isin"], Psm),
-                         Paragraph(_eur(r["val"]), ParagraphStyle("rr", parent=Psm, alignment=TA_RIGHT)),
-                         Paragraph(_pct(r["pct"], False, 2), ParagraphStyle("rr2", parent=Psm, alignment=TA_RIGHT))])
-        if total:
-            sub = sum(r["val"] for r in rows)
-            data.append([Paragraph("Totale", ParagraphStyle("tb", parent=Psm, fontName="Helvetica-Bold")), Paragraph("", Psm),
-                         Paragraph(_eur(sub), ParagraphStyle("tr", parent=Psm, fontName="Helvetica-Bold", alignment=TA_RIGHT)),
-                         Paragraph(_pct(sub / d["nav"], False, 2), ParagraphStyle("tr2", parent=Psm, fontName="Helvetica-Bold", alignment=TA_RIGHT))])
-        t = Table(data, colWidths=[82 * mm, 36 * mm, 32 * mm, 16 * mm], repeatRows=1)
-        t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), blu2), ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, alt]),
-                               ("TOPPADDING", (0, 0), (-1, -1), 1.6),
-                               ("BOTTOMPADDING", (0, 0), (-1, -1), 1.6)]))
+    def colonna(fetta):
+        dati, st = [], []
+        for i, (tipo, testo, v) in enumerate(fetta):
+            if tipo == "rep":
+                dati.append([Paragraph(testo.upper(), HR), Paragraph(PC.pct(v), HRP)])
+                st += [("BACKGROUND", (0, i), (-1, i), PC.COLORE_REPARTO.get(testo, PC.BLU)),
+                       ("TOPPADDING", (0, i), (-1, i), 2.4), ("BOTTOMPADDING", (0, i), (-1, i), 2.6)]
+            elif tipo == "set":
+                dati.append([Paragraph(testo.upper(), HS), Paragraph(PC.pct(v), RP)])
+                st += [("BACKGROUND", (0, i), (-1, i), PC.ALT),
+                       ("TOPPADDING", (0, i), (-1, i), 2.2), ("BOTTOMPADDING", (0, i), (-1, i), 2.2)]
+            else:
+                dati.append([Paragraph(testo, RN), Paragraph(PC.pct(v), RV)])
+                st += [("LINEBELOW", (0, i), (-1, i), 0.2, colors.HexColor("#EFEDE7")),
+                       ("TOPPADDING", (0, i), (-1, i), 1.5), ("BOTTOMPADDING", (0, i), (-1, i), 1.5)]
+        t = Table(dati or [[Paragraph("", RN), Paragraph("", RV)]],
+                  colWidths=[CWc * 0.70, CWc * 0.30])
+        t.setStyle(TableStyle(st + [("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                                    ("RIGHTPADDING", (0, 0), (-1, -1), 3)]))
         return t
 
-    for s, rows in d["sett"]:
-        story.append(KeepTogether([Spacer(1, 4), postable(rows, "Azioni · " + s)]))
-    for cat in ("ETF", "Obbligazioni", "Fondi UCITS", "Oro", "Derivati", "Liquidità"):
-        rows = d["cats"].get(cat)
-        if rows: story.append(KeepTogether([Spacer(1, 4), postable(rows, cat, total=(cat != "Derivati"))]))
-    story.append(Paragraph("Totale %d posizioni · valore titoli %s (esclusi ratei e liquidità)." % (d["n_pos"], _eur(d["val_titoli"])), Psm))
-
-    frame = Frame(18 * mm, 15 * mm, A4[0] - 36 * mm, A4[1] - 42 * mm, id="f", leftPadding=0, rightPadding=0)
-    doc = BaseDocTemplate(path, pagesize=A4, pageTemplates=[PageTemplate(id="t", frames=[frame], onPage=on_page)])
-    doc.build(story)
-    return path
+    gr = Table([[colonna(righe[a:b]) for a, b in tagli]], colWidths=[cw / 3.0] * 3)
+    gr.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                            ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+    return gr
 
 # ============================== anteprima HTML ==============================
 def cliente_html(d):

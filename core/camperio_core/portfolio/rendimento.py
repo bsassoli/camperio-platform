@@ -131,14 +131,14 @@ def componi(valori):
 
 
 def media_annua(cumulato, anni):
-    """Rendimento medio annuo composto. None sotto un anno e mezzo: annualizzare un
-    periodo infrannuale produce un numero che non significa nulla."""
+    """Rendimento medio annuo composto. None sotto l'anno: annualizzare un periodo
+    infrannuale produce un numero che non significa nulla."""
     if cumulato is None:
         return None
     try:
         anni = float(anni)
     except (TypeError, ValueError):
         return None
-    if anni < 1.5 or 1.0 + cumulato <= 0:
+    if anni < 1.0 or 1.0 + cumulato <= 0:
         return None
     return (1.0 + cumulato) ** (1.0 / anni) - 1.0

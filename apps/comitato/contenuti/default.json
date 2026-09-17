@@ -12,8 +12,15 @@
  "convinzioni_premessa": "",
  "convinzioni": [],
  "note_metodologiche": [
-  ["Rendimento lordo e rendimento netto", "I rendimenti sono al <b>lordo delle commissioni</b>. Il netto compare nel quadro patrimoniale, dove la differenza è visibile come riga di commissioni."],
-  ["Metodologia", "Rendimento calcolato con il metodo <i>time-weighted</i>, che neutralizza l'effetto di apporti e prelievi."]
+  [
+   "Rendimento lordo e rendimento netto",
+   "I rendimenti sono al <b>lordo delle commissioni</b>. Il netto compare nel quadro patrimoniale, dove la differenza è visibile come riga di commissioni."
+  ],
+  [
+   "Metodologia",
+   "Rendimento calcolato con il metodo <i>time-weighted</i>, che neutralizza l'effetto di apporti e prelievi."
+  ]
  ],
- "chiusura": "Restiamo a disposizione per qualsiasi chiarimento."
+ "chiusura": "Restiamo a disposizione per qualsiasi chiarimento.",
+ "parametro": ""
 }

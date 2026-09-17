@@ -190,8 +190,12 @@ def build_cliente(pf, repo_dir, livello=1):
     reparti = [(k, rep[k]) for k in M.MACRO_ORDER if k in rep]
     testi = CONT.carica(info["linea"])
     convinzioni = CONT.convinzioni_con_peso(testi, pf["positions"], nav)
+    # Al cliente il parametro si scrive per esteso: il codice interno (CMP21) non dice nulla.
+    # La descrizione sta nei contenuti della linea; in mancanza si usa quello che da' il gestionale.
+    bench = (testi.get("parametro") or (pf.get("sre") or {}).get("benchmark")
+             or ex.get("bench", "") or "")
     return {"descli": info["descli"], "codcli": meta["codcli"], "linea": info["linea"] or "—",
-            "bench": ex.get("bench", ""), "data": DL._fmt_it(meta["data"]), "iso": meta["data"],
+            "bench": bench, "bench_codice": ex.get("bench", ""), "data": DL._fmt_it(meta["data"]), "iso": meta["data"],
             "nav": nav, "nav_inizio": nav_inizio, "base_alloc": base_alloc,
             "patrimoniale": patr, "giorni": giorni,
             "ytd_p": ytd_p, "ytd_b": ytd_b, "extra": extra, "gain": gain,
@@ -284,7 +288,7 @@ def _perf_e_narrativa(d, cw, s, ch):
                   "<b>€ %s</b>%s." % (PC.eur(d["nav_inizio"]), PC.eur(d["nav"]),
                                       PC.eur(d["gain"]) if d["gain"] is not None else "—", gg), s["body"]),
         Paragraph("Rendimento al lordo delle commissioni, calcolato con metodologia time-weighted. "
-                  "Parametro di riferimento della linea: %s." % (d["bench"] or "—"), s["nota"])]
+                  "Parametro di riferimento della linea: %s." % (PC.esc(d["bench"]) or "—"), s["nota"])]
     return PC.affianca(_img(ch, "perf", 60, 44), testo, cw, quota=0.33)
 
 
@@ -293,8 +297,12 @@ def _composizione(d, cw, s, ch):
     from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
     # Il grafico dei settori ha senso solo se i settori sono davvero mappati: in DEMO,
     # senza il Repository_Fondi, finiscono tutti in "n.d." e una barra sola non dice nulla.
-    settori = [(k, r) for k, r in (d.get("sett") or []) if k and k.lower() not in ("n.d.", "altro")]
-    con_settori = "sett" in ch and len(settori) >= 2
+    tutti = d.get("sett") or []
+    settori = [(k, r) for k, r in tutti if k and k.lower() not in ("n.d.", "altro")]
+    val_noti = sum(x["val"] for _k, r in settori for x in r)
+    val_tot = sum(x["val"] for _k, r in tutti for x in r)
+    con_settori = ("sett" in ch and len(settori) >= 2
+                   and val_noti >= 0.5 * (val_tot or 1))
     larg = (cw * 0.39) if con_settori else (cw * 0.62)
     rip = [[Paragraph("Ripartizione", s["th"]), Paragraph("Controvalore €", s["thr"]),
             Paragraph("%", s["thr"])]]
@@ -548,14 +556,15 @@ def _allegato_tre_colonne(d, cw):
     return gr
 
 # ============================== anteprima HTML ==============================
-def cliente_html(d):
+def cliente_html(d, titolo="Report al cliente"):
     pc = "1F7A4D" if (d["ytd_p"] or 0) >= 0 else "B3261E"
-    head = ('<div class="rh"><div class="rt">Report Cliente — Rendiconto sintetico</div>'
-            f'<div class="rs">{d["descli"]} · conto {d["codcli"]} · linea {d["linea"]} · benchmark {d["bench"]} · al {d["data"]} · export PDF (frontespizio bianco)</div></div>')
+    head = (f'<div class="rh"><div class="rt">{titolo} — Linea {d["linea"]}</div>'
+            f'<div class="rs">{d["descli"]} · conto {d["codcli"]} · parametro {d["bench"]} · '
+            f'al {d["data"]} · rendimenti al lordo delle commissioni</div></div>')
     kp = ('<div class="kp">'
           + f'<div class="ki"><div class="kl">Valore portafoglio</div><div class="kv">{_eur(d["nav"])}</div></div>'
-          + f'<div class="ki"><div class="kl">Guadagno YTD (€)</div><div class="kv" style="color:#{pc}">{_eur(d["gain"]) if d["gain"] is not None else "n.d."}</div></div>'
-          + f'<div class="ki"><div class="kl">Performance YTD</div><div class="kv" style="color:#{pc}">{_pct(d["ytd_p"],True,2)}</div><div class="ks">bench {_pct(d["ytd_b"],True,2)}</div></div>'
+          + f'<div class="ki"><div class="kl">Risultato lordo</div><div class="kv" style="color:#{pc}">{_eur(d["gain"]) if d["gain"] is not None else "n.d."}</div></div>'
+          + f'<div class="ki"><div class="kl">Rendimento lordo</div><div class="kv" style="color:#{pc}">{_pct(d["ytd_p"],True,2)}</div><div class="ks">netto {_pct(d["ytd_n"],True,2)} · parametro {_pct(d["ytd_b"],True,2)}</div></div>'
           + f'<div class="ki"><div class="kl">Extra-rendimento</div><div class="kv" style="color:#{pc}">{_pct(d["extra"],True,2)} p.p.</div></div>'
           + '</div>')
     def tbl(headers, rows):

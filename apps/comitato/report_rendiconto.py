@@ -323,7 +323,7 @@ def rendiconto_pdf(d, path):
         E.append(PC.affianca(Image(ch["anni"], width=cw * 0.46, height=cw * 0.46 * (1.72 / 3.35)),
                              testo, cw, quota=0.47))
     E.append(Paragraph("Parametro di riferimento della linea: %s. I rendimenti passati non sono indicativi "
-                       "di quelli futuri." % (d["bench"] or "—"), s["nota"]))
+                       "di quelli futuri." % (PC.esc(d["bench"]) or "—"), s["nota"]))
 
     # ---------------- pagina 3: composizione ----------------
     E.append(PageBreak())
@@ -652,7 +652,7 @@ def rendiconto_html(d):
     testa = ('<div class="rh"><div class="rt">Rendiconto della gestione — Linea %s</div>'
              '<div class="rs">%s · conto %s · periodo %s — %s · parametro %s</div></div>'
              % (H.escape(d["linea"]), H.escape(d["descli"]), H.escape(d["codcli"]),
-                DL._fmt_it(d["data_base"]), d["data"], H.escape(d["bench"] or "—")))
+                DL._fmt_it(d["data_base"]), d["data"], H.escape(PC.esc(d["bench"]) or "—")))
     kp = ('<div class="kp">'
           + '<div class="ki"><div class="kl">Valore del portafoglio</div><div class="kv">€ %s</div></div>' % PC.eur(d["nav"])
           + '<div class="ki"><div class="kl">Risultato lordo</div><div class="kv">%s</div></div>' % PC.sg_eur(ris_l, 0)

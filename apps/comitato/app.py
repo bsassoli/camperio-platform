@@ -124,7 +124,7 @@ def _report_html(tipo, pf):
             return RC.comitato_html(RC.build_comitato(pf, DL.REPO))
         if tipo == "cliente_rendiconto":
             return RREN.rendiconto_html(RREN.build_rendiconto(pf, DL.REPO))
-        return RCLI.cliente_html(RCLI.build_cliente(pf, DL.REPO))
+        return RCLI.cliente_html(RCLI.build_cliente(pf, DL.REPO), TIPI_CLI[tipo].split(" (")[0])
     if tipo == "titoli":  return L.titoli_html(L.build_titoli(pf, DL.REPO))
     if tipo == "variazioni": return L.variazioni_html(L.build_variazioni(pf, DL.REPO))
     return '<div class="note err">Tipo report non disponibile.</div>'

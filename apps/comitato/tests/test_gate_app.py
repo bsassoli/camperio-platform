@@ -23,7 +23,7 @@ def test_download_bloccato_409_se_matrice_incoerente(monkeypatch):
              "azioni": {}, "bond": {}, "totale": {"EUR": 550000.0}}
     monkeypatch.setattr(A.L, "build_matrix", lambda pf, repo: rotta)
     client = A.app.test_client()
-    for tipo in ("matrice", "comitato", "cliente1"):
+    for tipo in ("matrice", "comitato", "cliente_sintetica", "cliente_sintesi", "cliente_rendiconto"):
         r = client.get("/download?schema=ANTASIMGEST&codcli=DEMO01&tipo=" + tipo)
         assert r.status_code == 409, tipo
     r = client.get("/api/preview?schema=ANTASIMGEST&codcli=DEMO01&tipo=matrice")

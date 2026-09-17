@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Comitato Investimenti - app interattiva analisi portafogli Camperio SIM.
-Report: Matrice Valutaria, Titoli lordo/netto vs benchmark, Pesi e scostamenti.
+Report interni: Matrice Valutaria, Titoli lordo/netto vs benchmark, Variazioni prezzi, Sintesi Comitato.
+Report al cliente: Sintetica (1 pagina), Sintesi (3 pagine), Rendiconto periodico (9 pagine).
 Date DAL/AL libere (calendario): AL deve esistere (altrimenti niente report), DAL flessibile con avviso."""
 import os, tempfile, datetime, html, urllib.parse
 from flask import Flask, render_template, request, jsonify, send_file, Response
@@ -8,6 +9,7 @@ import data_layer as DL
 import lookthrough as L
 import report_comitato as RC
 import report_cliente as RCLI
+import report_rendiconto as RREN
 from camperio_core.portfolio.validation import validate_report
 from camperio_core.oracle.client import OracleIndisponibileError
 
@@ -29,7 +31,12 @@ app = Flask(__name__)
 BUILD = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
 TIPI = {"matrice": "Matrice Valutaria", "titoli": "Titoli lordo/netto vs benchmark",
         "variazioni": "Variazioni prezzi", "comitato": "Sintesi Comitato (Word)"}
-TIPI_CLI = {"cliente1": "Cliente — Sintetico (PDF)"}
+# I tre documenti al cliente, layout "Comitato Investimenti".
+TIPI_CLI = {"cliente_sintetica": "Cliente — Sintetica, 1 pagina (PDF)",
+            "cliente_sintesi": "Cliente — Sintesi, 3 pagine (PDF)",
+            "cliente_rendiconto": "Cliente — Rendiconto periodico (PDF)"}
+# Report costruiti sulla matrice valutaria: passano dal cancello deterministico.
+CON_GATE = ("matrice", "comitato") + tuple(TIPI_CLI)
 LABEL = {**TIPI, **TIPI_CLI}
 
 def current_user():
@@ -106,7 +113,7 @@ def download_etf_route():
     return jsonify(ok=bool(ok), msg=msg, dettaglio=res)
 
 def _report_html(tipo, pf):
-    if tipo in ("matrice", "comitato", "cliente1"):
+    if tipo in CON_GATE:
         m = L.build_matrix(pf, DL.REPO)
         gate = _controlla_matrice(m)
         if not gate.ok:
@@ -115,6 +122,8 @@ def _report_html(tipo, pf):
             return L.matrice_html(m)
         if tipo == "comitato":
             return RC.comitato_html(RC.build_comitato(pf, DL.REPO))
+        if tipo == "cliente_rendiconto":
+            return RREN.rendiconto_html(RREN.build_rendiconto(pf, DL.REPO))
         return RCLI.cliente_html(RCLI.build_cliente(pf, DL.REPO))
     if tipo == "titoli":  return L.titoli_html(L.build_titoli(pf, DL.REPO))
     if tipo == "variazioni": return L.variazioni_html(L.build_variazioni(pf, DL.REPO))
@@ -149,7 +158,7 @@ def download():
     if not rp["ok"]:
         return Response(rp["error"], status=409, mimetype="text/plain; charset=utf-8")
     pf = DL.get_portfolio(schema, codcli, dal=rp["dal"], al=rp["al"])
-    if tipo in ("matrice", "comitato", "cliente1"):
+    if tipo in CON_GATE:
         gate = _controlla_matrice(L.build_matrix(pf, DL.REPO))
         if not gate.ok:
             msg = "Report bloccato dal controllo deterministico: " + \
@@ -168,8 +177,12 @@ def download():
         v = L.build_variazioni(pf, DL.REPO); (L.variazioni_excel if fmt == "excel" else L.variazioni_word)(v, path)
     elif tipo == "comitato":
         RC.comitato_word(RC.build_comitato(pf, DL.REPO), path)
-    elif tipo == "cliente1":
-        RCLI.cliente_pdf(RCLI.build_cliente(pf, DL.REPO), path)
+    elif tipo == "cliente_sintetica":
+        RCLI.sintetica_pdf(RCLI.build_cliente(pf, DL.REPO), path)
+    elif tipo == "cliente_sintesi":
+        RCLI.sintesi_pdf(RCLI.build_cliente(pf, DL.REPO), path)
+    elif tipo == "cliente_rendiconto":
+        RREN.rendiconto_pdf(RREN.build_rendiconto(pf, DL.REPO), path)
     return send_file(path, as_attachment=True, download_name=os.path.basename(path))
 
 @app.errorhandler(OracleIndisponibileError)

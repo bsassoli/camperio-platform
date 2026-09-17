@@ -25,7 +25,13 @@
    "isin": "",
    "ccy": "EUR",
    "macro": "Difesa",
-   "sub": "Liquidità & margini"
+   "sub": "Liquidità & margini",
+   "divisa": "EUR",
+   "quanti": 50000.0,
+   "costmed": null,
+   "unimer": 1.0,
+   "camuni": null,
+   "valrat": 0.0
   },
   {
    "codabi": "4ND360",
@@ -37,7 +43,13 @@
    "isin": "IE00B4ND3602",
    "ccy": null,
    "macro": "Difesa",
-   "sub": "Oro fisico"
+   "sub": "Oro fisico",
+   "divisa": "EUR",
+   "quanti": 2399,
+   "costmed": 186.0767,
+   "unimer": 208.4487,
+   "camuni": null,
+   "valrat": 0.0
   },
   {
    "codabi": "95ZYC2",
@@ -49,7 +61,13 @@
    "isin": "IE000DEMO001",
    "ccy": "LOOKTHROUGH",
    "macro": "Centro Campo",
-   "sub": "Fondi UCITS"
+   "sub": "Fondi UCITS",
+   "divisa": "EUR",
+   "quanti": 21089,
+   "costmed": 46.851,
+   "unimer": 71.1283,
+   "camuni": null,
+   "valrat": 0.0
   },
   {
    "codabi": "8W8C01",
@@ -61,7 +79,13 @@
    "isin": "IE000DEMO002",
    "ccy": "LOOKTHROUGH",
    "macro": "Centro Campo",
-   "sub": "Fondi UCITS"
+   "sub": "Fondi UCITS",
+   "divisa": "EUR",
+   "quanti": 14983,
+   "costmed": 34.1271,
+   "unimer": 53.3922,
+   "camuni": null,
+   "valrat": 0.0
   },
   {
    "codabi": "54OPLF",
@@ -73,7 +97,13 @@
    "isin": "IE000DEMO003",
    "ccy": "LOOKTHROUGH",
    "macro": "Centro Campo",
-   "sub": "Fondi UCITS"
+   "sub": "Fondi UCITS",
+   "divisa": "EUR",
+   "quanti": 5547,
+   "costmed": 62.9636,
+   "unimer": 90.1447,
+   "camuni": null,
+   "valrat": 0.0
   },
   {
    "codabi": "8W8C34",
@@ -85,7 +115,13 @@
    "isin": "IE000DEMO004",
    "ccy": "LOOKTHROUGH",
    "macro": "Centro Campo",
-   "sub": "Fondi UCITS"
+   "sub": "Fondi UCITS",
+   "divisa": "EUR",
+   "quanti": 2590,
+   "costmed": 105.3486,
+   "unimer": 154.4326,
+   "camuni": null,
+   "valrat": 0.0
   },
   {
    "codabi": "0M6317",
@@ -97,7 +133,13 @@
    "isin": "IE00B0M63177",
    "ccy": "EM",
    "macro": "Attacco",
-   "sub": "ETF azionari"
+   "sub": "ETF azionari",
+   "divisa": "EUR",
+   "quanti": 2566,
+   "costmed": 99.0835,
+   "unimer": 116.9087,
+   "camuni": null,
+   "valrat": 0.0
   },
   {
    "codabi": "E27585",
@@ -109,7 +151,13 @@
    "isin": "DE0005933923",
    "ccy": "EUR",
    "macro": "Attacco",
-   "sub": "ETF azionari"
+   "sub": "ETF azionari",
+   "divisa": "EUR",
+   "quanti": 1785,
+   "costmed": 80.5312,
+   "unimer": 112.0674,
+   "camuni": null,
+   "valrat": 0.0
   },
   {
    "codabi": "DEM001",
@@ -121,7 +169,13 @@
    "isin": "US0378331005",
    "ccy": "USD",
    "macro": "Attacco",
-   "sub": "Azioni dirette"
+   "sub": "Azioni dirette",
+   "divisa": "USD",
+   "quanti": 6651,
+   "costmed": 131.1794,
+   "unimer": 156.2088,
+   "camuni": 1.1544,
+   "valrat": 0.0
   },
   {
    "codabi": "DEM002",
@@ -133,7 +187,13 @@
    "isin": "US5949181045",
    "ccy": "USD",
    "macro": "Attacco",
-   "sub": "Azioni dirette"
+   "sub": "Azioni dirette",
+   "divisa": "USD",
+   "quanti": 1683,
+   "costmed": 293.0793,
+   "unimer": 411.5303,
+   "camuni": 1.1544,
+   "valrat": 0.0
   },
   {
    "codabi": "DEM003",
@@ -145,7 +205,13 @@
    "isin": "US67066G1040",
    "ccy": "USD",
    "macro": "Attacco",
-   "sub": "Azioni dirette"
+   "sub": "Azioni dirette",
+   "divisa": "USD",
+   "quanti": 18480,
+   "costmed": 21.5085,
+   "unimer": 24.9864,
+   "camuni": 1.1544,
+   "valrat": 0.0
   },
   {
    "codabi": "DEM004",
@@ -157,7 +223,13 @@
    "isin": "DE0007164600",
    "ccy": "EUR",
    "macro": "Attacco",
-   "sub": "Azioni dirette"
+   "sub": "Azioni dirette",
+   "divisa": "EUR",
+   "quanti": 1449,
+   "costmed": 277.1674,
+   "unimer": 345.1201,
+   "camuni": null,
+   "valrat": 0.0
   },
   {
    "codabi": "DEM005",
@@ -169,7 +241,13 @@
    "isin": "CH0038863350",
    "ccy": "CHF",
    "macro": "Attacco",
-   "sub": "Azioni dirette"
+   "sub": "Azioni dirette",
+   "divisa": "CHF",
+   "quanti": 1142,
+   "costmed": 186.081,
+   "unimer": 248.2883,
+   "camuni": 0.945,
+   "valrat": 0.0
   },
   {
    "codabi": "DEM006",
@@ -181,7 +259,13 @@
    "isin": "US7960508882",
    "ccy": "KRW",
    "macro": "Attacco",
-   "sub": "Azioni dirette"
+   "sub": "Azioni dirette",
+   "divisa": "KRW",
+   "quanti": 2164,
+   "costmed": 90.6067,
+   "unimer": 115.5087,
+   "camuni": null,
+   "valrat": 0.0
   },
   {
    "codabi": "DEM007",
@@ -193,7 +277,13 @@
    "isin": "DK0062498333",
    "ccy": "DKK",
    "macro": "Attacco",
-   "sub": "Azioni dirette"
+   "sub": "Azioni dirette",
+   "divisa": "DKK",
+   "quanti": 675,
+   "costmed": 171.7077,
+   "unimer": 222.0865,
+   "camuni": null,
+   "valrat": 0.0
   },
   {
    "codabi": "DEM008",
@@ -205,7 +295,13 @@
    "isin": "US91282CJZ59",
    "ccy": "USD",
    "macro": "Difesa",
-   "sub": "Obbligazionario"
+   "sub": "Obbligazionario",
+   "divisa": "USD",
+   "quanti": 1402000.0,
+   "costmed": 97.0162,
+   "unimer": 98.792,
+   "camuni": 1.1544,
+   "valrat": 4800.0
   },
   {
    "codabi": "DEM009",
@@ -217,7 +313,13 @@
    "isin": "IT0005580045",
    "ccy": "EUR",
    "macro": "Difesa",
-   "sub": "Obbligazionario"
+   "sub": "Obbligazionario",
+   "divisa": "EUR",
+   "quanti": 1089000.0,
+   "costmed": 100.4877,
+   "unimer": 101.0494,
+   "camuni": null,
+   "valrat": 4400.0
   },
   {
    "codabi": "DEM010",
@@ -229,7 +331,13 @@
    "isin": "GB00BLBDX619",
    "ccy": "GBP",
    "macro": "Difesa",
-   "sub": "Obbligazionario"
+   "sub": "Obbligazionario",
+   "divisa": "GBP",
+   "quanti": 176000.0,
+   "costmed": 95.0569,
+   "unimer": 97.3884,
+   "camuni": 0.8564,
+   "valrat": 800.0
   },
   {
    "codabi": "DEM011",
@@ -241,7 +349,13 @@
    "isin": "",
    "ccy": "EUR",
    "macro": "Difesa",
-   "sub": "Liquidità & margini"
+   "sub": "Liquidità & margini",
+   "divisa": "EUR",
+   "quanti": 130000.0,
+   "costmed": null,
+   "unimer": 1.0,
+   "camuni": null,
+   "valrat": 0.0
   },
   {
    "codabi": "DEM012",
@@ -253,7 +367,13 @@
    "isin": "",
    "ccy": "USD",
    "macro": "Difesa",
-   "sub": "Liquidità & margini"
+   "sub": "Liquidità & margini",
+   "divisa": "USD",
+   "quanti": 115440.0,
+   "costmed": null,
+   "unimer": 1.0,
+   "camuni": 1.1544,
+   "valrat": 0.0
   },
   {
    "codabi": "DEM013",
@@ -265,7 +385,13 @@
    "isin": "",
    "ccy": "EUR",
    "macro": "Overlay",
-   "sub": "Derivati (opzioni)"
+   "sub": "Derivati (opzioni)",
+   "divisa": "EUR",
+   "quanti": 1,
+   "costmed": null,
+   "unimer": null,
+   "camuni": null,
+   "valrat": 0.0
   },
   {
    "codabi": "E35492",
@@ -277,7 +403,13 @@
    "isin": "",
    "ccy": "EUR",
    "macro": "Overlay",
-   "sub": "Derivati (opzioni)"
+   "sub": "Derivati (opzioni)",
+   "divisa": "EUR",
+   "quanti": 1,
+   "costmed": null,
+   "unimer": null,
+   "camuni": null,
+   "valrat": 0.0
   }
  ],
  "sre": {

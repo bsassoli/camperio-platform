@@ -3,6 +3,7 @@
 LIVE se ORA_USER/ORA_PWD/ORA_DSN sono presenti e oracledb e' installato; altrimenti DEMO."""
 import os, json, re, datetime
 from camperio_core.portfolio import methodology as M
+from camperio_core.portfolio.rendimento import TIPI_COMMISSIONE as R_TIPI_COMMISSIONE
 from camperio_core import config as _cfg
 from camperio_core.oracle.client import OracleClient
 
@@ -249,13 +250,18 @@ def get_portfolio(schema, codcli, dal=None, al=None, data=None):
               ".SRE WHERE CODCLI=:c AND PERIODO<=DATE '2025-12-31' ORDER BY PERIODO DESC FETCH FIRST 1 ROWS ONLY", {"c": codcli})
     base = base[0] if base else {"CONSFIN": curr["CONSFIN"], "TCLI": curr["TCLI"], "TBMK": curr["TBMK"]}
 
-    wp = _q("SELECT CODABI, DESTITB DES, GRUTIT, DIVISA, QUANTI, VALMER, VALOREFUT, DELTA, CODISIN, BLOOMBERG FROM " +
+    wp = _q("SELECT CODABI, DESTITB DES, GRUTIT, DIVISA, QUANTI, COSTMED, UNIMER, CAMUNI, VALRAT, VALMER, VALOREFUT, DELTA, CODISIN, BLOOMBERG FROM " +
             schema + ".WCTDD WHERE CODCLI=:c AND VALMER<>0 ORDER BY VALMER DESC", {"c": codcli})
     positions = []
     for r in wp:
         d = dict(codabi=r["CODABI"], des=r["DES"] or "", grutit=r["GRUTIT"] or "",
                  valmer=float(r["VALMER"] or 0), valorefut=float(r["VALOREFUT"] or r["VALMER"] or 0),
-                 bbg=r.get("BLOOMBERG") or "", isin=r.get("CODISIN") or "")
+                 bbg=r.get("BLOOMBERG") or "", isin=r.get("CODISIN") or "",
+                 divisa=r.get("DIVISA") or "", quanti=float(r["QUANTI"] or 0),
+                 costmed=(float(r["COSTMED"]) if r.get("COSTMED") is not None else None),
+                 unimer=(float(r["UNIMER"]) if r.get("UNIMER") is not None else None),
+                 camuni=(float(r["CAMUNI"]) if r.get("CAMUNI") else None),
+                 valrat=float(r["VALRAT"] or 0))
         mac, sub = M.macro(d["grutit"]); d["macro"] = mac; d["sub"] = sub; d["ccy"] = M.currency_of(d)
         positions.append(d)
 
@@ -389,7 +395,7 @@ def comitato_extra(schema, codcli, dal, al):
         r = _q("SELECT CONSFIN, TCLI, TBMK, CODIND FROM " + S + ".SRE WHERE CODCLI=:c AND PERIODO=TO_DATE(:d,'YYYY-MM-DD')", {"c": codcli, "d": d})
         return r[0] if r else None
     sa = _sre(al); sd = _sre(dal) or sa
-    bq = _q("SELECT TCLI, TBMK, CONSFIN FROM " + S + ".SRE WHERE CODCLI=:c AND PERIODO < TRUNC(TO_DATE(:al,'YYYY-MM-DD'),'YEAR') ORDER BY PERIODO DESC FETCH FIRST 1 ROWS ONLY", {"c": codcli, "al": al})
+    bq = _q("SELECT TO_CHAR(PERIODO,'YYYY-MM-DD') D, TCLI, TBMK, CONSFIN FROM " + S + ".SRE WHERE CODCLI=:c AND PERIODO < TRUNC(TO_DATE(:al,'YYYY-MM-DD'),'YEAR') ORDER BY PERIODO DESC FETCH FIRST 1 ROWS ONLY", {"c": codcli, "al": al})
     der = _q("SELECT NVL(SUM(NVL(w.VALOREFUT,0)),0) de FROM " + S + ".WCTDD w JOIN " + S + ".TIT t ON t.CODABI=w.CODABI "
              "WHERE w.CODCLI=:c AND (t.GRUTIT LIKE 'F%' OR t.GRUTIT LIKE 'G%') AND ("
              "UPPER(t.DESTITB) LIKE '%S&P%' OR UPPER(t.DESTITB) LIKE '%MINI FUT%' OR UPPER(t.DESTITB) LIKE '%STOXX%' "
@@ -435,7 +441,8 @@ def comitato_extra(schema, codcli, dal, al):
         "tcli_al": float(sa["TCLI"]), "tcli_dal": float(sd["TCLI"]),
         "tbmk_al": float(sa["TBMK"]), "tbmk_dal": float(sd["TBMK"]), "bench": sa.get("CODIND") or "",
         "tcli_base": (float(bb["TCLI"]) if bb else None), "tbmk_base": (float(bb["TBMK"]) if bb else None),
-        "nav_base": (float(bb["CONSFIN"]) if bb else None), "der_eq": der_eq, "deriv_pos": deriv_pos,
+        "nav_base": (float(bb["CONSFIN"]) if bb else None), "data_base": (bb["D"] if bb else None),
+        "der_eq": der_eq, "deriv_pos": deriv_pos,
         "comp": [{"macro": r["MACRO"], "val_al": float(r["VAL_AL"] or 0), "val_dal": float(r["VAL_DAL"] or 0)} for r in comp],
         "trades": [{"nome": r["NOME"], "verso": r["VERSO"], "qty": float(r["QUANTI"] or 0),
                     "prezzo": float(r["PREZUNI"] or 0), "data": r["DATA"],
@@ -461,3 +468,113 @@ def contract_info(schema, codcli):
     tg = rows[0].get("TIPOGE") or ""
     return {"descli": rows[0].get("DESCLI") or codcli, "tipoge": tg,
             "linea": LINEA.get(tg, tg), "gruppo": _gruppo(schema, tg)}
+
+
+# ================= serie storiche e oneri (report al cliente) =================
+# Queste funzioni servono ai tre report al cliente (Sintetica, Sintesi, Rendiconto).
+# In DEMO leggono tutte da fixtures/<codcli>_rendiconto.json.
+
+def _cache_rendiconto(codcli):
+    p = os.path.join(FIXTURES, codcli + "_rendiconto.json")
+    return json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}
+
+
+def commissioni(schema, codcli, dal, al):
+    """Addebiti commissionali Camperio nel periodo (dal escluso, al incluso).
+
+    L'importo e' `MOV.CTVREG`, cioe' il netto per 1,22: **IVA inclusa**, che e' quanto
+    va restituito al montante per passare dal rendimento netto al lordo. `CTVCNO` e' il
+    netto e non va usato qui. Gli storni (`FBOSTO`, `OPESTO`) sono esclusi.
+    Il `nav` e' `SRE.CONSFIN` del giorno dell'addebito, non del giorno precedente.
+    """
+    if mode() == "DEMO":
+        from camperio_core.portfolio import rendimento as R
+        return R.nel_periodo(_cache_rendiconto(codcli).get("commissioni", []), dal, al)
+    assert schema in SCHEMI, "schema non valido"
+    tipi = ", ".join("'" + t + "'" for t in R_TIPI_COMMISSIONE)
+    rows = _q("SELECT TO_CHAR(m.DATOPE,'YYYY-MM-DD') data, m.TIPOPE tipo, NVL(m.CTVREG,0) imp, "
+              "(SELECT s.CONSFIN FROM " + schema + ".SRE s WHERE s.CODCLI=m.CODCLI AND s.PERIODO=TRUNC(m.DATOPE)) nav "
+              "FROM " + schema + ".MOV m WHERE m.CODCLI=:c AND m.TIPOPE IN (" + tipi + ") "
+              "AND TRUNC(m.DATOPE) > TO_DATE(:dal,'YYYY-MM-DD') AND TRUNC(m.DATOPE) <= TO_DATE(:al,'YYYY-MM-DD') "
+              "AND NVL(m.FBOSTO,0)=0 AND NVL(m.OPESTO,0)=0 ORDER BY m.DATOPE",
+              {"c": codcli, "dal": dal, "al": al})
+    return [{"data": r["DATA"], "tipo": r.get("TIPO") or "", "importo": float(r["IMP"] or 0),
+             "nav": float(r["NAV"] or 0)} for r in rows]
+
+
+def serie_mensile(schema, codcli, al, esercizi=5):
+    """Fine-mese di SRE (TCLI, TBMK) dal 31/12 di `esercizi` anni prima fino ad `al`.
+
+    Il primo elemento e' la base (31/12) e non produce una riga nella matrice.
+    L'ultimo fine-mese e' quello chiuso: il mese in corso si calcola a parte sugli
+    estremi, perche' `al` di norma non e' fine mese.
+    """
+    if mode() == "DEMO":
+        return _cache_rendiconto(codcli).get("serie_mensile", [])
+    assert schema in SCHEMI, "schema non valido"
+    base = str(int(al[:4]) - esercizi) + "-12-31"
+    rows = _q("SELECT TO_CHAR(PERIODO,'YYYY-MM-DD') data, TCLI, TBMK FROM " + schema + ".SRE "
+              "WHERE CODCLI=:c AND PERIODO BETWEEN TO_DATE(:base,'YYYY-MM-DD') AND TO_DATE(:al,'YYYY-MM-DD') "
+              "AND PERIODO IN (SELECT MAX(PERIODO) FROM " + schema + ".SRE WHERE CODCLI=:c "
+              "GROUP BY TO_CHAR(PERIODO,'YYYYMM')) ORDER BY PERIODO",
+              {"c": codcli, "base": base, "al": al})
+    return [{"data": r["DATA"], "tcli": float(r["TCLI"] or 0), "tbmk": float(r["TBMK"] or 0)} for r in rows]
+
+
+def serie_giornaliera(schema, codcli, dal, al):
+    """Serie giornaliera di SRE (TCLI, TBMK) fra dal e al inclusi, per il grafico lineare."""
+    if mode() == "DEMO":
+        s = _cache_rendiconto(codcli).get("serie_giornaliera", [])
+        return [r for r in s if dal <= r.get("data", "") <= al]
+    assert schema in SCHEMI, "schema non valido"
+    rows = _q("SELECT TO_CHAR(PERIODO,'YYYY-MM-DD') data, TCLI, TBMK FROM " + schema + ".SRE "
+              "WHERE CODCLI=:c AND PERIODO BETWEEN TO_DATE(:dal,'YYYY-MM-DD') AND TO_DATE(:al,'YYYY-MM-DD') "
+              "ORDER BY PERIODO", {"c": codcli, "dal": dal, "al": al})
+    return [{"data": r["DATA"], "tcli": float(r["TCLI"] or 0), "tbmk": float(r["TBMK"] or 0)} for r in rows]
+
+
+def quadro_patrimoniale(schema, codcli, dal, al):
+    """Movimenti del patrimonio fra dal e al: il ponte della prima pagina del Rendiconto.
+
+    `APPORTI` e `PRELIEVI` in SRE sono **cumulati dall'inizio del rapporto**: si prende
+    la differenza fra le due date, mai la somma dei giorni. Lo stesso vale per `PLUSMIN`,
+    la cui differenza e' il risultato **netto** del periodo.
+    Deve valere: cons_ini + apporti + prelievi + risultato_netto = cons_fin.
+    """
+    if mode() == "DEMO":
+        return _cache_rendiconto(codcli).get("patrimoniale", {})
+    assert schema in SCHEMI, "schema non valido"
+
+    def _at(d):
+        r = _q("SELECT CONSFIN, PLUSMIN, APPORTI, PRELIEVI FROM " + schema + ".SRE "
+               "WHERE CODCLI=:c AND PERIODO<=TO_DATE(:d,'YYYY-MM-DD') ORDER BY PERIODO DESC FETCH FIRST 1 ROWS ONLY",
+               {"c": codcli, "d": d})
+        return r[0] if r else None
+
+    a, b = _at(dal), _at(al)
+    if not a or not b:
+        return {}
+    return {"cons_ini": float(a["CONSFIN"] or 0), "cons_fin": float(b["CONSFIN"] or 0),
+            "apporti": float(b["APPORTI"] or 0) - float(a["APPORTI"] or 0),
+            "prelievi": float(b["PRELIEVI"] or 0) - float(a["PRELIEVI"] or 0),
+            "risultato_netto": float(b["PLUSMIN"] or 0) - float(a["PLUSMIN"] or 0)}
+
+
+def oneri(schema, codcli, dal, al):
+    """Oneri del periodo per la pagina costi: commissioni per tipo, spese di
+    negoziazione (`CTVSPE`), ritenute (`CTVRIT`). L'imposta di bollo non sta in MOV:
+    e' il prelievo mensile che il gestionale registra in SRE, quindi arriva da
+    `quadro_patrimoniale` come `prelievi`."""
+    if mode() == "DEMO":
+        return _cache_rendiconto(codcli).get("oneri", {})
+    assert schema in SCHEMI, "schema non valido"
+    per_tipo = {}
+    for c in commissioni(schema, codcli, dal, al):
+        per_tipo[c["tipo"]] = per_tipo.get(c["tipo"], 0.0) + c["importo"]
+    r = _q("SELECT NVL(SUM(ABS(NVL(CTVSPE,0))),0) spese, NVL(SUM(ABS(NVL(CTVRIT,0))),0) riten "
+           "FROM " + schema + ".MOV WHERE CODCLI=:c "
+           "AND TRUNC(DATOPE) BETWEEN TO_DATE(:dal,'YYYY-MM-DD') AND TO_DATE(:al,'YYYY-MM-DD') "
+           "AND NVL(FBOSTO,0)=0 AND NVL(OPESTO,0)=0", {"c": codcli, "dal": dal, "al": al})
+    return {"per_tipo": per_tipo,
+            "spese_negoziazione": float(r[0]["SPESE"]) if r else 0.0,
+            "ritenute": float(r[0]["RITEN"]) if r else 0.0}
